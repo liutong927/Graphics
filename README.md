@@ -1,2 +1,2 @@
 # Graphics
-computer graphics related stuff.
+computer graphics study repo.
