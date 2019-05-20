@@ -1,6 +1,7 @@
 #include "../Utils/tgaimage.h"
 #include "../Utils/model.h"
 #include "Line.h"
+#include "../Utils/geometry.h"
 
 const TGAColor white = TGAColor(255, 255, 255, 255);
 const TGAColor red = TGAColor(255, 0, 0, 255);
@@ -67,15 +68,57 @@ namespace
 		Line::DrawAndFillTriangle2D_BoundingBox(t1, InImage, white);
 		Line::DrawAndFillTriangle2D_BoundingBox(t2, InImage, green);
 	}
+
+	void DrawModelFlatShadingTest(int InWidth, int InHeight, TGAImage& InImage)
+	{
+		// parse model file .obj using utils class Model.
+		Model ModelData("F:\\workdir\\personal\\Rasterizer\\Resource\\african_head.obj");
+		
+		Vec3f LightDir(0, 0, -1);
+		for (int FaceIndex = 0; FaceIndex < ModelData.nfaces(); FaceIndex++)
+		{
+			std::vector<int> FaceData = ModelData.face(FaceIndex);
+			// face data should contain 3 vertex
+			// draw 3 lines of each face.
+			Vec2i Triangle[3];
+			Vec3f TriangleWorld[3];
+			for (int index = 0; index < 3; index++)
+			{
+				Vec3f FaceVertex0 = ModelData.vert(FaceData[index]);
+
+				int X0 = (FaceVertex0.x + 1.)*InWidth / 2.;
+				int Y0 = (FaceVertex0.y + 1.)*InHeight / 2.;
+
+				Triangle[index] = Vec2i(X0, Y0);
+				TriangleWorld[index] = FaceVertex0;
+			}
+
+			Vec3f Normal = cross(TriangleWorld[2] - TriangleWorld[0], TriangleWorld[1] - TriangleWorld[0]);
+			Normal.normalize();
+
+			// dot product is negative, remove the face (back-face culling).
+			float Intensity = LightDir*Normal;
+			if (Intensity > 0)
+			{
+				Line::DrawAndFillTriangle2D_BoundingBox(Triangle, InImage,
+					TGAColor(Intensity * 255, Intensity * 255, Intensity * 255, 255));
+			}
+
+			//// random color shading.
+			//Line::DrawAndFillTriangle2D_BoundingBox(Triangle, InImage,
+			//	TGAColor(std::rand() % 255, std::rand() % 255, std::rand() % 255, 255));
+		}
+	}
 }
 
 int main(int argc, char** argv) 
 {
-	TGAImage image(200, 200, TGAImage::RGB);
+	TGAImage image(800, 800, TGAImage::RGB);
 
 	//DrawLineTest(image);
 	//DrawModelWireFrameTest(Width, Height, image);
-	DrawTriangleTest(image);
+	//DrawTriangleTest(image);
+	DrawModelFlatShadingTest(800, 800, image);
 
 	image.flip_vertically(); // i want to have the origin at the left bottom corner of the image
 	image.write_tga_file("output.tga");
