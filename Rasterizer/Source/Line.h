@@ -2,6 +2,7 @@
 
 #include "../Utils/tgaimage.h"
 #include <algorithm>
+#include "../Utils/geometry.h"
 
 class Line
 {
@@ -134,7 +135,7 @@ public:
 	// 1. Sort vertices of the triangle by their y - coordinates;
 	// 2. Rasterize simultaneously the left and the right sides of the triangle;
 	// 3. Draw a horizontal line segment between the left and the right boundary points.
-	static void DrawAndFillTriangle2D(Vec2i InVert0, Vec2i InVert1, Vec2i InVert2, TGAImage &InImage, TGAColor InColor)
+	static void DrawAndFillTriangle2D_LineSweep(Vec2i InVert0, Vec2i InVert1, Vec2i InVert2, TGAImage &InImage, TGAColor InColor)
 	{
 		// first attempt:
 		/*
@@ -300,6 +301,65 @@ public:
 			int EndX = InVert0.x - Slope02*(firstSegments + index);
 			DrawLine(StartX, Y, EndX, Y, InImage, InColor);
 			index++;
+		}
+	}
+
+	// find barycentric coordinates of point P regarding triangle ABC.
+	static Vec3f ComputeBarycentric(Vec2i* InPoints, Vec2i InP)
+	{
+		Vec3f U = cross(Vec3f(InPoints[2].x - InPoints[0].x, InPoints[1].x - InPoints[0].x, InPoints[0].x - InP.x),
+			Vec3f(InPoints[2].y - InPoints[0].y, InPoints[1].y - InPoints[0].y, InPoints[0].y - InP.y));
+		// InPoints and InP has integer value as coordinates.
+		// so if abs(u.z)<1 means abs(u[2])=0?
+		if (std::abs(U.z) < 1)
+		{
+			return Vec3f(-1, 1, 1);
+		}
+
+		return Vec3f(1.f - (U.x + U.y) / U.z, U.y / U.z, U.x / U.z);
+	}
+
+	// fill triangle by bounding-box algorithm.
+	// iterate through all pixels of a bounding box for a given triangle. 
+	// For each pixel we compute its barycentric coordinates. If it has at least one negative component, then the pixel is outside of the triangle.
+	static void DrawAndFillTriangle2D_BoundingBox(Vec2i* InVert, TGAImage &InImage, TGAColor InColor)
+	{
+		// find bounding box of triangle by give 3 points.
+		// a bounding box is defined by 2 points: bottom left and upper right of box containing triangle.
+		// to find these corner points, iterate through 3 vertices of the triangle and choose min/max coordinates.
+		Vec2i BBoxMin(0, 0);
+		Vec2i BBoxMax(InImage.get_width(), InImage.get_height());
+
+		// find triangle vertices' min X/Y and max X/Y
+		// also need to consider triangle may out of image box.
+		std::vector<Vec2i> Triangle;
+		for (int index = 0; index < 3; index++)
+		{
+			Triangle.push_back(InVert[index]);
+		}
+
+		std::sort(Triangle.begin(), Triangle.end(), [](Vec2i a, Vec2i b) {return a.y > b.y; });
+		BBoxMax.y = std::min(InImage.get_height(), Triangle[0].y);
+		BBoxMin.y = std::max(0, Triangle[2].y);
+
+		std::sort(Triangle.begin(), Triangle.end(), [](Vec2i a, Vec2i b) {return a.x > b.x; });
+		BBoxMax.x = std::min(InImage.get_width(), Triangle[0].x);
+		BBoxMin.x = std::max(0, Triangle[2].x);
+
+		// for each pixel in this bounding box, test point if it is inside triangle, if yes draw pixel.
+		for (int X = BBoxMin.x; X < BBoxMax.x; X++)
+		{
+			for (int Y = BBoxMin.y; Y < BBoxMax.y; Y++)
+			{
+				Vec3f BarycentricVec = ComputeBarycentric(InVert, Vec2i(X, Y));
+
+				if (BarycentricVec.x < 0 || BarycentricVec.y < 0 || BarycentricVec.z < 0)
+				{
+					continue;
+				}
+
+				InImage.set(X, Y, InColor);
+			}
 		}
 	}
 };

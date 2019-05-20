@@ -59,9 +59,13 @@ namespace
 		//Line::DrawTriangle2D(t1[0], t1[1], t1[2], InImage, white);
 		//Line::DrawTriangle2D(t2[0], t2[1], t2[2], InImage, green);
 
-		Line::DrawAndFillTriangle2D(t0[0], t0[1], t0[2], InImage, red);
-		Line::DrawAndFillTriangle2D(t1[0], t1[1], t1[2], InImage, white);
-		Line::DrawAndFillTriangle2D(t2[0], t2[1], t2[2], InImage, green);
+		//Line::DrawAndFillTriangle2D_LineSweep(t0[0], t0[1], t0[2], InImage, red);
+		//Line::DrawAndFillTriangle2D_LineSweep(t1[0], t1[1], t1[2], InImage, white);
+		//Line::DrawAndFillTriangle2D_LineSweep(t2[0], t2[1], t2[2], InImage, green);
+		
+		Line::DrawAndFillTriangle2D_BoundingBox(t0, InImage, red);
+		Line::DrawAndFillTriangle2D_BoundingBox(t1, InImage, white);
+		Line::DrawAndFillTriangle2D_BoundingBox(t2, InImage, green);
 	}
 }
 
