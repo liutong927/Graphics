@@ -6,6 +6,7 @@
 const TGAColor white = TGAColor(255, 255, 255, 255);
 const TGAColor red = TGAColor(255, 0, 0, 255);
 const TGAColor green = TGAColor(0, 255, 0, 255);
+const TGAColor blue = TGAColor(0, 0, 255, 255);
 
 namespace
 {
@@ -73,6 +74,12 @@ namespace
 	{
 		// parse model file .obj using utils class Model.
 		Model ModelData("F:\\workdir\\personal\\Rasterizer\\Resource\\african_head.obj");
+
+		float* ZBuffer = new float[InWidth*InHeight];
+		for (int Index = 0; Index < InWidth*InHeight; Index++)
+		{
+			ZBuffer[Index] = -std::numeric_limits<float>::max();
+		}
 		
 		Vec3f LightDir(0, 0, -1);
 		for (int FaceIndex = 0; FaceIndex < ModelData.nfaces(); FaceIndex++)
@@ -80,7 +87,7 @@ namespace
 			std::vector<int> FaceData = ModelData.face(FaceIndex);
 			// face data should contain 3 vertex
 			// draw 3 lines of each face.
-			Vec2i Triangle[3];
+			Vec3f Triangle[3];
 			Vec3f TriangleWorld[3];
 			for (int index = 0; index < 3; index++)
 			{
@@ -89,7 +96,7 @@ namespace
 				int X0 = (FaceVertex0.x + 1.)*InWidth / 2.;
 				int Y0 = (FaceVertex0.y + 1.)*InHeight / 2.;
 
-				Triangle[index] = Vec2i(X0, Y0);
+				Triangle[index] = Vec3f(X0, Y0, FaceVertex0.z);
 				TriangleWorld[index] = FaceVertex0;
 			}
 
@@ -100,7 +107,10 @@ namespace
 			float Intensity = LightDir*Normal;
 			if (Intensity > 0)
 			{
-				Line::DrawAndFillTriangle2D_BoundingBox(Triangle, InImage,
+				//Line::DrawAndFillTriangle2D_BoundingBox(Triangle, InImage,
+				//	TGAColor(Intensity * 255, Intensity * 255, Intensity * 255, 255));
+
+				Line::DrawAndFillTriangle3DWithZBuffer_BoundingBox(Triangle, ZBuffer, InImage,
 					TGAColor(Intensity * 255, Intensity * 255, Intensity * 255, 255));
 			}
 
@@ -108,6 +118,56 @@ namespace
 			//Line::DrawAndFillTriangle2D_BoundingBox(Triangle, InImage,
 			//	TGAColor(std::rand() % 255, std::rand() % 255, std::rand() % 255, 255));
 		}
+
+		delete ZBuffer;
+	}
+
+	void Rasterize(Vec2i InP0, Vec2i InP1, TGAImage& InImage, TGAColor InColor, int* YBuffer)
+	{
+		if (InP0.x > InP1.x)
+		{
+			std::swap(InP0, InP1);
+		}
+
+		for (int X = InP0.x; X < InP1.x; X++)
+		{
+			int Y = float(InP1.y - InP0.y) / float(InP1.x - InP0.x)*(X - InP0.x) + InP0.y;
+			if (Y > YBuffer[X])
+			{
+				YBuffer[X] = Y;
+				//Line::DrawLine(InP0, InP1, InImage, InColor);
+				InImage.set(X, InImage.get_height()/2, InColor);
+			}
+		}
+	}
+
+	// draw 1-D lines with Y buffer
+	// assume we have 3 intersect planes, draw them on a plane/a line.
+	// the key is to cache an array buffer represents current pixel Y value.
+	// the initial value is minus infinity. each time we rasterize, we update 
+	// this Y buffer if Y value of to-be-drawn pixel is larger than current Y buffer.
+	void RasterizeWithYBufferTest(TGAImage& InImage)
+	{
+		//// scene "2d mesh"
+		//Line::DrawLine(Vec2i(20, 34), Vec2i(744, 400), InImage, red);
+		//Line::DrawLine(Vec2i(120, 434), Vec2i(444, 400), InImage, green);
+		//Line::DrawLine(Vec2i(330, 463), Vec2i(594, 200), InImage, blue);
+
+		//// screen line
+		//Line::DrawLine(Vec2i(10, 10), Vec2i(790, 10), InImage, white);
+
+		int YBuffer[800];
+
+		// initial YBuffer to minus infinity.
+		for (int index = 0; index < 800; index++)
+		{
+			YBuffer[index] = std::numeric_limits<int>::min();
+		}
+
+		// Do the rasterize.
+		Rasterize(Vec2i(20, 34), Vec2i(744, 400), InImage, red, YBuffer);
+		Rasterize(Vec2i(120, 434), Vec2i(444, 400), InImage, green, YBuffer);
+		Rasterize(Vec2i(330, 463), Vec2i(594, 200), InImage, blue, YBuffer);
 	}
 }
 
@@ -119,6 +179,7 @@ int main(int argc, char** argv)
 	//DrawModelWireFrameTest(Width, Height, image);
 	//DrawTriangleTest(image);
 	DrawModelFlatShadingTest(800, 800, image);
+	//RasterizeWithYBufferTest(image);
 
 	image.flip_vertically(); // i want to have the origin at the left bottom corner of the image
 	image.write_tga_file("output.tga");

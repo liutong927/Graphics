@@ -319,6 +319,20 @@ public:
 		return Vec3f(1.f - (U.x + U.y) / U.z, U.y / U.z, U.x / U.z);
 	}
 
+	static Vec3f ComputeBarycentric3D(Vec3f* InPoints, Vec3f InP)
+	{
+		Vec3f U = cross(Vec3f(InPoints[2].x - InPoints[0].x, InPoints[1].x - InPoints[0].x, InPoints[0].x - InP.x),
+			Vec3f(InPoints[2].y - InPoints[0].y, InPoints[1].y - InPoints[0].y, InPoints[0].y - InP.y));
+		// InPoints and InP has integer value as coordinates.
+		// so if abs(u.z)<1 means abs(u[2])=0?
+		if (std::abs(U.z) < 1e-2)
+		{
+			return Vec3f(-1, 1, 1);
+		}
+
+		return Vec3f(1.f - (U.x + U.y) / U.z, U.y / U.z, U.x / U.z);
+	}
+
 	// fill triangle by bounding-box algorithm.
 	// iterate through all pixels of a bounding box for a given triangle. 
 	// For each pixel we compute its barycentric coordinates. If it has at least one negative component, then the pixel is outside of the triangle.
@@ -359,6 +373,63 @@ public:
 				}
 
 				InImage.set(X, Y, InColor);
+			}
+		}
+	}
+
+	// Fill triangle with z buffer.
+	static void DrawAndFillTriangle3DWithZBuffer_BoundingBox(Vec3f* InVert, float* InZBuffer, TGAImage &InImage, TGAColor InColor)
+	{
+		// find bounding box of triangle by give 3 points.
+		// a bounding box is defined by 2 points: bottom left and upper right of box containing triangle.
+		// to find these corner points, iterate through 3 vertices of the triangle and choose min/max coordinates.
+		Vec2f BBoxMin(0, 0);
+		Vec2f BBoxMax(InImage.get_width(), InImage.get_height());
+
+		// find triangle vertices' min X/Y and max X/Y
+		// also need to consider triangle may out of image box.
+		std::vector<Vec3f> Triangle;
+		for (int index = 0; index < 3; index++)
+		{
+			Triangle.push_back(InVert[index]);
+		}
+
+		std::sort(Triangle.begin(), Triangle.end(), [](Vec3f a, Vec3f b) {return a.y > b.y; });
+		BBoxMax.y = std::min((float)InImage.get_height(), Triangle[0].y);
+		BBoxMin.y = std::max(0.f, Triangle[2].y);
+
+		std::sort(Triangle.begin(), Triangle.end(), [](Vec3f a, Vec3f b) {return a.x > b.x; });
+		BBoxMax.x = std::min((float)InImage.get_width(), Triangle[0].x);
+		BBoxMin.x = std::max(0.f, Triangle[2].x);
+
+		// for each pixel in this bounding box, test point if it is inside triangle, if yes draw pixel.
+		for (int X = BBoxMin.x; X < BBoxMax.x; X++)
+		{
+			for (int Y = BBoxMin.y; Y < BBoxMax.y; Y++)
+			{
+				Vec3f CurrentPoint(X, Y, 0);
+				Vec3f BarycentricVec = ComputeBarycentric3D(InVert, CurrentPoint);
+
+				if (BarycentricVec.x < 0 || BarycentricVec.y < 0 || BarycentricVec.z < 0)
+				{
+					continue;
+				}
+
+				// take into account z-buffer.
+				// z-buffer is 2-dimension(width*height), make it 1D array.
+				// compute pixel's z value by barycentric coordinates multiply triangle's vertice's z value.
+
+				CurrentPoint.z = Triangle[0].z*BarycentricVec.x +
+					Triangle[1].z*BarycentricVec.y +
+					Triangle[2].z*BarycentricVec.z;
+
+
+				int CurrentPointZBufferIndex = InImage.get_width()*Y + X;
+				if (InZBuffer[CurrentPointZBufferIndex] < CurrentPoint.z)
+				{
+					InZBuffer[CurrentPointZBufferIndex] = CurrentPoint.z;
+					InImage.set(X, Y, InColor);
+				}
 			}
 		}
 	}
