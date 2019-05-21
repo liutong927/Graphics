@@ -110,7 +110,13 @@ namespace
 				//Line::DrawAndFillTriangle2D_BoundingBox(Triangle, InImage,
 				//	TGAColor(Intensity * 255, Intensity * 255, Intensity * 255, 255));
 
-				Line::DrawAndFillTriangle3DWithZBuffer_BoundingBox(Triangle, ZBuffer, InImage,
+				Vec2f UV[3];
+				for (int VertexIdx = 0; VertexIdx < 3; VertexIdx++)
+				{
+					UV[VertexIdx] = ModelData.uv(FaceIndex, VertexIdx);
+				}
+
+				Line::DrawAndFillTriangle3DWithZBuffer_BoundingBox(Triangle, UV, ZBuffer, InImage,
 					TGAColor(Intensity * 255, Intensity * 255, Intensity * 255, 255));
 			}
 
@@ -119,7 +125,7 @@ namespace
 			//	TGAColor(std::rand() % 255, std::rand() % 255, std::rand() % 255, 255));
 		}
 
-		delete ZBuffer;
+		delete [] ZBuffer;
 	}
 
 	void Rasterize(Vec2i InP0, Vec2i InP1, TGAImage& InImage, TGAColor InColor, int* YBuffer)

@@ -378,7 +378,7 @@ public:
 	}
 
 	// Fill triangle with z buffer.
-	static void DrawAndFillTriangle3DWithZBuffer_BoundingBox(Vec3f* InVert, float* InZBuffer, TGAImage &InImage, TGAColor InColor)
+	static void DrawAndFillTriangle3DWithZBuffer_BoundingBox(Vec3f* InVert, Vec2f* InUVs, float* InZBuffer, TGAImage &InImage, TGAColor InColor)
 	{
 		// find bounding box of triangle by give 3 points.
 		// a bounding box is defined by 2 points: bottom left and upper right of box containing triangle.
