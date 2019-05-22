@@ -3,6 +3,9 @@
 #include "Line.h"
 #include "../Utils/geometry.h"
 
+#define _USE_MATH_DEFINES // need to define to use M_PI.
+#include <math.h>
+
 const TGAColor white = TGAColor(255, 255, 255, 255);
 const TGAColor red = TGAColor(255, 0, 0, 255);
 const TGAColor green = TGAColor(0, 255, 0, 255);
@@ -12,6 +15,11 @@ namespace
 {
 	int Width = 800;
 	int Height = 800;
+	int Depth = 255;
+
+	//*************************************************************************
+	// Line/Triangle/Model Draw Test
+	//*************************************************************************
 
 	void DrawPixelTest(TGAImage& InImage)
 	{
@@ -175,6 +183,164 @@ namespace
 		Rasterize(Vec2i(120, 434), Vec2i(444, 400), InImage, green, YBuffer);
 		Rasterize(Vec2i(330, 463), Vec2i(594, 200), InImage, blue, YBuffer);
 	}
+
+	//*************************************************************************
+	// Matrix Operation Test
+	//*************************************************************************
+
+	// 4*1 matrix to vec3f.
+	Vec3f Matrix2Vec(Matrix InMatrix)
+	{
+		return Vec3f(InMatrix[0][0] / InMatrix[3][0], InMatrix[1][0] / InMatrix[3][0], InMatrix[2][0] / InMatrix[3][0]);
+	}
+
+	// vec3f to 4*1 matrix.
+	Matrix Vec2Matrix(Vec3f InVec)
+	{
+		Matrix Result(4, 1);
+		Result[0][0] = InVec.x;
+		Result[1][0] = InVec.y;
+		Result[2][0] = InVec.z;
+		Result[3][0] = 1.f;
+
+		return Result;
+	}
+
+	//
+	Matrix Viewport(int X, int Y, int Width, int Height)
+	{
+		Matrix Result(Matrix::Identity(4));
+
+		Result[0][3] = X + Width / 2.f;
+		Result[1][3] = Y + Height / 2.f;
+		Result[2][3] = Depth / 2.f;
+
+		Result[0][0] = Width / 2.f;
+		Result[1][1] = Height / 2.f;
+		Result[2][2] = Depth / 2.f;
+		return Result;
+	}
+
+	// Vec3f convert to translation matrix
+	Matrix Translation(Vec3f InVec)
+	{
+		Matrix Translation(Matrix::Identity(4));
+		Translation[0][3] = InVec.x;
+		Translation[1][3] = InVec.y;
+		Translation[2][3] = InVec.z;
+
+		return Translation;
+	}
+
+	// Vec3f convert to scale matrix
+	Matrix Scale(Vec3f InVec)
+	{
+		Matrix Scale(Matrix::Identity(4));
+		Scale[0][0] = InVec.x;
+		Scale[1][1] = InVec.y;
+		Scale[2][2] = InVec.z;
+
+		return Scale;
+	}
+
+	// Zoom by apply same scaling.
+	Matrix Zoom(float InFactor)
+	{
+		Vec3f ZoomVec(InFactor, InFactor, InFactor);
+		return Scale(ZoomVec);
+	}
+
+	// Vec3f convert to rotation matrix
+	// rotate along x-axis.
+	Matrix RotationX(float InCosAngle, float InSinAngle)
+	{
+		Matrix Rotation(Matrix::Identity(4));
+
+		Rotation[1][1] = Rotation[2][2] = InCosAngle;
+		Rotation[1][2] = -InSinAngle;
+		Rotation[2][1] = InSinAngle;
+
+		return Rotation;
+	}
+
+	// rotate along y-axis.
+	Matrix RotationY(float InCosAngle, float InSinAngle)
+	{
+		Matrix Rotation(Matrix::Identity(4));
+
+		Rotation[0][0] = Rotation[2][2] = InCosAngle;
+		Rotation[0][2] = -InSinAngle;
+		Rotation[2][0] = InSinAngle;
+
+		return Rotation;
+	}
+
+	// rotate along z-axis.
+	Matrix RotationZ(float InCosAngle, float InSinAngle)
+	{
+		Matrix Rotation(Matrix::Identity(4));
+
+		Rotation[0][0] = Rotation[1][1] = InCosAngle;
+		Rotation[0][1] = -InSinAngle;
+		Rotation[1][0] = InSinAngle;
+
+		return Rotation;
+	}
+
+	void MatrixOperationTest(TGAImage& InImage)
+	{
+		// draw axis
+		Vec3f XAxis(1.f, 0.f, 0.f);
+		Vec3f YAxis(0.f, 1.f, 0.f);
+		Vec3f Origin(0.f, 0.f, 0.f);
+
+		Matrix VPMatrix(Viewport(Width / 4, Height / 4, Width / 2, Height / 2));
+		XAxis = Matrix2Vec(VPMatrix*Vec2Matrix(XAxis));
+		YAxis = Matrix2Vec(VPMatrix*Vec2Matrix(YAxis));
+		Origin = Matrix2Vec(VPMatrix*Vec2Matrix(Origin));
+
+		Line::DrawLine(Origin.x, Origin.y, XAxis.x, XAxis.y, InImage, red);
+		Line::DrawLine(Origin.x, Origin.y, YAxis.x, YAxis.y, InImage, green);
+
+		// draw square
+		Vec3f V1(0.5f, 0.5f, 0.f);
+		Vec3f V2(0.5f, -0.5f, 0.f);
+		Vec3f V3(-0.5f, -0.5f, 0.f);
+		Vec3f V4(-0.5f, 0.5f, 0.f);
+
+		// original square
+		//V1 = Matrix2Vec(VPMatrix*Vec2Matrix(V1));
+		//V2 = Matrix2Vec(VPMatrix*Vec2Matrix(V2));
+		//V3 = Matrix2Vec(VPMatrix*Vec2Matrix(V3));
+		//V4 = Matrix2Vec(VPMatrix*Vec2Matrix(V4));
+
+		// square applied with basic transform
+		// Important: Transform needs to be applied after VPMatrix
+		Matrix Transform1(Translation(Vec3f(1, 0, 0)));
+		Matrix Transform2(Scale(Vec3f(2, 2, 2)));
+		Matrix Transform3(RotationZ(cos(M_PI / 180.f * 30), sin(M_PI / 180.f * 30)));
+
+		// notice order of same transforms matters.
+		// first translate then rotate is different from first rotate then translate!
+		Matrix Transform = Transform3*Transform1;
+
+		V1 = Matrix2Vec(VPMatrix*Transform*Vec2Matrix(V1));
+		V2 = Matrix2Vec(VPMatrix*Transform*Vec2Matrix(V2));
+		V3 = Matrix2Vec(VPMatrix*Transform*Vec2Matrix(V3));
+		V4 = Matrix2Vec(VPMatrix*Transform*Vec2Matrix(V4));
+
+		// draw square line
+		Line::DrawLine(V1.x, V1.y, V2.x, V2.y, InImage, white);
+		Line::DrawLine(V2.x, V2.y, V3.x, V3.y, InImage, white);
+		Line::DrawLine(V3.x, V3.y, V4.x, V4.y, InImage, white);
+		Line::DrawLine(V4.x, V4.y, V1.x, V1.y, InImage, white);
+	}
+
+	// considering vertex's z value of triangle.
+	void DrawModelWithPerspectiveProjection(int InWidth, int InHeight, TGAImage& InImage)
+	{
+
+	}
 }
 
 int main(int argc, char** argv) 
@@ -184,8 +350,11 @@ int main(int argc, char** argv)
 	//DrawLineTest(image);
 	//DrawModelWireFrameTest(Width, Height, image);
 	//DrawTriangleTest(image);
-	DrawModelFlatShadingTest(800, 800, image);
+	//DrawModelFlatShadingTest(800, 800, image);
 	//RasterizeWithYBufferTest(image);
+
+	MatrixOperationTest(image);
+	//DrawModelWithPerspectiveProjection(800, 800, image);
 
 	image.flip_vertically(); // i want to have the origin at the left bottom corner of the image
 	image.write_tga_file("output.tga");

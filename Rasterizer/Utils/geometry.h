@@ -2,8 +2,11 @@
 #define __GEOMETRY_H__
 
 #include <cmath>
+#include <vector>
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//**********************************************************************
+//                         Vector
+//**********************************************************************
 
 template <class t> struct Vec2 {
 	union {
@@ -55,6 +58,32 @@ template <class t> std::ostream& operator<<(std::ostream& s, Vec3<t>& v) {
 template <typename t> Vec3<t> cross(Vec3<t> v1, Vec3<t> v2) {
 	return Vec3<t>(v1.y*v2.z - v1.z*v2.y, v1.z*v2.x - v1.x*v2.z, v1.x*v2.y - v1.y*v2.x);
 }
+
+
+//**********************************************************************
+//                         Matrix
+//**********************************************************************
+class Matrix
+{
+public:
+	Matrix(int InRow = 4, int InCol = 4);
+
+	inline int NRows() { return Rows; }
+	inline int NCols() { return Cols; }
+
+	static Matrix Identity(int InDimensions);
+	std::vector<float>& operator[](const int i);
+	Matrix operator*(const Matrix& InM);
+	Matrix Transpose();
+	Matrix Inverse();
+
+	friend std::ostream& operator<<(std::ostream& s, Matrix& m);
+
+private:
+	std::vector<std::vector<float>> Elements;
+	int Rows;
+	int Cols;
+};
 
 
 #endif //__GEOMETRY_H__

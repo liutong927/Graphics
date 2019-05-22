@@ -111,6 +111,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Source\Main.cpp" />
+    <ClCompile Include="Utils\geometry.cpp" />
     <ClCompile Include="Utils\model.cpp" />
     <ClCompile Include="Utils\tgaimage.cpp" />
   </ItemGroup>
