@@ -117,7 +117,7 @@ namespace
 				}
 
 				Line::DrawAndFillTriangle3DWithZBuffer_BoundingBox(Triangle, UV, ZBuffer, InImage,
-					TGAColor(Intensity * 255, Intensity * 255, Intensity * 255, 255));
+					TGAColor(Intensity * 255, Intensity * 255, Intensity * 255, 255), ModelData);
 			}
 
 			//// random color shading.

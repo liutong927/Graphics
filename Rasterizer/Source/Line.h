@@ -3,6 +3,7 @@
 #include "../Utils/tgaimage.h"
 #include <algorithm>
 #include "../Utils/geometry.h"
+#include "../Utils/model.h"
 
 class Line
 {
@@ -378,7 +379,7 @@ public:
 	}
 
 	// Fill triangle with z buffer.
-	static void DrawAndFillTriangle3DWithZBuffer_BoundingBox(Vec3f* InVert, Vec2f* InUVs, float* InZBuffer, TGAImage &InImage, TGAColor InColor)
+	static void DrawAndFillTriangle3DWithZBuffer_BoundingBox(Vec3f* InVert, Vec2f* InUVs, float* InZBuffer, TGAImage &InImage, TGAColor InColor, Model& InModel)
 	{
 		// find bounding box of triangle by give 3 points.
 		// a bounding box is defined by 2 points: bottom left and upper right of box containing triangle.
@@ -394,6 +395,7 @@ public:
 			Triangle.push_back(InVert[index]);
 		}
 
+		// find min/max x/y of 3 vertices of this triangle
 		std::sort(Triangle.begin(), Triangle.end(), [](Vec3f a, Vec3f b) {return a.y > b.y; });
 		BBoxMax.y = std::min((float)InImage.get_height(), Triangle[0].y);
 		BBoxMin.y = std::max(0.f, Triangle[2].y);
@@ -415,20 +417,36 @@ public:
 					continue;
 				}
 
+				// below handle pixel inside this triangle.
+				// compute each pixel's uv by Interpolation. How to Compute?
+				// we already the point inside triangle represent by 3 vertices(barycentric coordinates).
+				// so the uv of this point should also have same scaling in this coordinate system.
+				// get diffuse color by uv value. 
+				// this works. Brilliant! the interpolation method is better than original.
+				Vec2f InterpolatedUV;
+				InterpolatedUV.x = InUVs[0].x * BarycentricVec.x +
+					InUVs[1].x * BarycentricVec.y +
+					InUVs[2].x * BarycentricVec.z;
+				InterpolatedUV.y = InUVs[0].y * BarycentricVec.x +
+					InUVs[1].y * BarycentricVec.y +
+					InUVs[2].y * BarycentricVec.z;
+
 				// take into account z-buffer.
 				// z-buffer is 2-dimension(width*height), make it 1D array.
 				// compute pixel's z value by barycentric coordinates multiply triangle's vertice's z value.
-
-				CurrentPoint.z = Triangle[0].z*BarycentricVec.x +
-					Triangle[1].z*BarycentricVec.y +
-					Triangle[2].z*BarycentricVec.z;
-
+				CurrentPoint.z = InVert[0].z*BarycentricVec.x +
+					InVert[1].z*BarycentricVec.y +
+					InVert[2].z*BarycentricVec.z;
 
 				int CurrentPointZBufferIndex = InImage.get_width()*Y + X;
 				if (InZBuffer[CurrentPointZBufferIndex] < CurrentPoint.z)
 				{
 					InZBuffer[CurrentPointZBufferIndex] = CurrentPoint.z;
-					InImage.set(X, Y, InColor);
+					// pass Model as argument of this function to fetch diffuse data.
+					TGAColor Color = InModel.diffuse(InterpolatedUV);
+					// pass in color to get original intensity by InColor/255.
+					InImage.set(X, Y, TGAColor(Color.r*InColor.r / 255, Color.g*InColor.g / 255, Color.b*InColor.b / 255));
+					//InImage.set(X, Y, InColor);
 				}
 			}
 		}
