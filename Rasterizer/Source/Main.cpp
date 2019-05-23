@@ -16,6 +16,7 @@ namespace
 	int Width = 800;
 	int Height = 800;
 	int Depth = 255;
+	Vec3f Camera(0, 0, 3);
 
 	//*************************************************************************
 	// Line/Triangle/Model Draw Test
@@ -206,7 +207,7 @@ namespace
 		return Result;
 	}
 
-	//
+	// how to compute?
 	Matrix Viewport(int X, int Y, int Width, int Height)
 	{
 		Matrix Result(Matrix::Identity(4));
@@ -339,7 +340,62 @@ namespace
 	// considering vertex's z value of triangle.
 	void DrawModelWithPerspectiveProjection(int InWidth, int InHeight, TGAImage& InImage)
 	{
+		// parse model file .obj using utils class Model.
+		Model ModelData("F:\\workdir\\personal\\Rasterizer\\Resource\\african_head.obj");
 
+		float* ZBuffer = new float[InWidth*InHeight];
+		for (int Index = 0; Index < InWidth*InHeight; Index++)
+		{
+			ZBuffer[Index] = -std::numeric_limits<float>::max();
+		}
+
+		Matrix VPMatrix(Viewport(Width / 4, Height / 4, Width / 2, Height / 2));
+		// construct projection matrix
+		Matrix Projection(Matrix::Identity(4));
+		// perspective projection or make it orthogonal projection with identity
+		Projection[3][2] = -1. / Camera.z;
+
+		Vec3f LightDir(0, 0, -1);
+		for (int FaceIndex = 0; FaceIndex < ModelData.nfaces(); FaceIndex++)
+		{
+			std::vector<int> FaceData = ModelData.face(FaceIndex);
+			// face data should contain 3 vertex
+			// draw 3 lines of each face.
+			Vec3f TriangleScreen[3];
+			Vec3f TriangleWorld[3];
+			for (int index = 0; index < 3; index++)
+			{
+				Vec3f FaceVertex = ModelData.vert(FaceData[index]);
+
+				//int X0 = (FaceVertex.x + 1.)*InWidth / 2.;
+				//int Y0 = (FaceVertex.y + 1.)*InHeight / 2.;
+				//TriangleScreen[index] = Vec3f(X0, Y0, FaceVertex.z);
+
+				// transform world coordinates to screen coordinates with perspective projection.
+				TriangleScreen[index] = Matrix2Vec(VPMatrix*Projection*Vec2Matrix(FaceVertex));
+
+				TriangleWorld[index] = FaceVertex;
+			}
+
+			Vec3f Normal = cross(TriangleWorld[2] - TriangleWorld[0], TriangleWorld[1] - TriangleWorld[0]);
+			Normal.normalize();
+
+			// dot product is negative, remove the face (back-face culling).
+			float Intensity = LightDir*Normal;
+			if (Intensity > 0)
+			{
+				Vec2f UV[3];
+				for (int VertexIdx = 0; VertexIdx < 3; VertexIdx++)
+				{
+					UV[VertexIdx] = ModelData.uv(FaceIndex, VertexIdx);
+				}
+
+				Line::DrawAndFillTriangle3DWithZBuffer_BoundingBox(TriangleScreen, UV, ZBuffer, InImage,
+					TGAColor(Intensity * 255, Intensity * 255, Intensity * 255, 255), ModelData);
+			}
+		}
+
+		delete[] ZBuffer;
 	}
 }
 
@@ -353,8 +409,8 @@ int main(int argc, char** argv)
 	//DrawModelFlatShadingTest(800, 800, image);
 	//RasterizeWithYBufferTest(image);
 
-	MatrixOperationTest(image);
-	//DrawModelWithPerspectiveProjection(800, 800, image);
+	//MatrixOperationTest(image);
+	DrawModelWithPerspectiveProjection(800, 800, image);
 
 	image.flip_vertically(); // i want to have the origin at the left bottom corner of the image
 	image.write_tga_file("output.tga");

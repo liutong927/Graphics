@@ -1,2 +1,6 @@
 # Graphics
-computer graphics study repo.
+Computer Graphics study repo.
+
+## Rasterizer
+A coursework project following instruction from
+https://github.com/ssloy/tinyrenderer/
