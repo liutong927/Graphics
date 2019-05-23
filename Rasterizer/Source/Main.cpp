@@ -17,6 +17,9 @@ namespace
 	int Height = 800;
 	int Depth = 255;
 	Vec3f Camera(0, 0, 3);
+	Vec3f Eye(1, 1, 3);
+	Vec3f Center(0, 0, 0);
+
 
 	//*************************************************************************
 	// Line/Triangle/Model Draw Test
@@ -207,7 +210,10 @@ namespace
 		return Result;
 	}
 
-	// how to compute?
+	// viewport matrix.
+	// vertex -> [-1,1]
+	// after apply viewport matrix,
+	// [-1,1] is mapping to [X, X+Width] [Y, Y+Height] [0, Depth]
 	Matrix Viewport(int X, int Y, int Width, int Height)
 	{
 		Matrix Result(Matrix::Identity(4));
@@ -219,6 +225,27 @@ namespace
 		Result[0][0] = Width / 2.f;
 		Result[1][1] = Height / 2.f;
 		Result[2][2] = Depth / 2.f;
+		return Result;
+	}
+
+	// camera is at InEye, point to InCenter, InUp is camera direction which will be vertical frame
+	// how to compute this matrix?
+	Matrix LookAt(Vec3f InEye, Vec3f InCenter, Vec3f InUp)
+	{
+		Matrix Result(Matrix::Identity(4));
+		// compute transformed frame x,y,z axis.
+		Vec3f z = (InEye - InCenter).normalize();
+		Vec3f x = cross(InUp, z).normalize();
+		Vec3f y = cross(z, x).normalize();
+
+		for (int i = 0; i < 3; i++)
+		{
+			Result[0][i] = x.raw[i];
+			Result[1][i] = y.raw[i];
+			Result[2][i] = z.raw[i];
+			Result[i][3] = -InCenter.raw[i];
+		}
+
 		return Result;
 	}
 
@@ -349,11 +376,13 @@ namespace
 			ZBuffer[Index] = -std::numeric_limits<float>::max();
 		}
 
+		Matrix ModelView = LookAt(Eye, Center, Vec3f(0, 1, 0));
 		Matrix VPMatrix(Viewport(Width / 4, Height / 4, Width / 2, Height / 2));
 		// construct projection matrix
 		Matrix Projection(Matrix::Identity(4));
 		// perspective projection or make it orthogonal projection with identity
-		Projection[3][2] = -1. / Camera.z;
+		//Projection[3][2] = -1. / Camera.z;
+		Projection[3][2] = -1. / (Eye - Center).norm();
 
 		Vec3f LightDir(0, 0, -1);
 		for (int FaceIndex = 0; FaceIndex < ModelData.nfaces(); FaceIndex++)
@@ -367,12 +396,16 @@ namespace
 			{
 				Vec3f FaceVertex = ModelData.vert(FaceData[index]);
 
+				// original vertex's coordinates is between [-1,1], mapping to screen size(image size)
+				// (vertex+1)/2->[0,1], and (vertex+1)/2*imagesize->[0,imagesize]
 				//int X0 = (FaceVertex.x + 1.)*InWidth / 2.;
 				//int Y0 = (FaceVertex.y + 1.)*InHeight / 2.;
 				//TriangleScreen[index] = Vec3f(X0, Y0, FaceVertex.z);
 
 				// transform world coordinates to screen coordinates with perspective projection.
-				TriangleScreen[index] = Matrix2Vec(VPMatrix*Projection*Vec2Matrix(FaceVertex));
+				// transform: local to world by model matrix, then world to camera by projection matrix,
+				// then camera to screen by viewport matrix.
+				TriangleScreen[index] = Matrix2Vec(VPMatrix*Projection*ModelView*Vec2Matrix(FaceVertex));
 
 				TriangleWorld[index] = FaceVertex;
 			}

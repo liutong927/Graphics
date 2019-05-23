@@ -37,6 +37,12 @@ Model::Model(const char *filename) : verts_(), faces_() {
 			for (int i = 0; i < 2; i++) iss >> uv.raw[i];
 			uv_.push_back(uv);
 		}
+		else if (!line.compare(0, 3, "vn ")) {
+			iss >> trash >> trash;
+			Vec3f n;
+			for (int i = 0; i < 3; i++) iss >> n.raw[i];
+			norms_.push_back(n);
+		}
 		else if (!line.compare(0, 2, "f ")) {
 			std::vector<Vec3i> f;
 			Vec3i tmp;
@@ -77,6 +83,11 @@ Vec3f Model::vert(int i) {
 Vec2f Model::uv(int iface, int nthvert)
 {
 	return uv_[faces_[iface][nthvert].raw[1]];
+}
+
+Vec3f Model::norm(int iface, int nthvert)
+{
+	return norms_[faces_[iface][nthvert].raw[2]].normalize();
 }
 
 TGAColor Model::diffuse(Vec2f uvf)
