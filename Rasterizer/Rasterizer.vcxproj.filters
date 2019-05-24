@@ -41,5 +41,8 @@
     <ClInclude Include="Source\GL_Transform.h">
       <Filter>Source</Filter>
     </ClInclude>
+    <ClInclude Include="Source\GL_Shader.h">
+      <Filter>Source</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

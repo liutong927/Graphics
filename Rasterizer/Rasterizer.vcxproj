@@ -116,6 +116,7 @@
     <ClCompile Include="Utils\tgaimage.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Source\GL_Shader.h" />
     <ClInclude Include="Source\GL_Line.h" />
     <ClInclude Include="Source\GL_Transform.h" />
     <ClInclude Include="Source\GL_Triangle.h" />
