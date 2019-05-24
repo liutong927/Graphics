@@ -410,6 +410,8 @@ namespace
 				TriangleWorld[index] = FaceVertex;
 			}
 
+			// note here normal is based on triangle, if normal per vertex is given from model file,
+			// no need to compute triangle per triangle, just use normal per vertex.
 			Vec3f Normal = cross(TriangleWorld[2] - TriangleWorld[0], TriangleWorld[1] - TriangleWorld[0]);
 			Normal.normalize();
 
@@ -430,6 +432,66 @@ namespace
 
 		delete[] ZBuffer;
 	}
+
+	// refactor DrawModelWithPerspectiveProjection a bit.
+	void DrawModelGouraudShading(int InWidth, int InHeight, TGAImage& InImage)
+	{
+		// parse model file .obj using utils class Model.
+		Model ModelData("F:\\workdir\\personal\\Rasterizer\\Resource\\african_head.obj");
+
+		float* ZBuffer = new float[InWidth*InHeight];
+		for (int Index = 0; Index < InWidth*InHeight; Index++)
+		{
+			ZBuffer[Index] = -std::numeric_limits<float>::max();
+		}
+
+		Matrix ModelView = LookAt(Eye, Center, Vec3f(0, 1, 0));
+		Matrix VPMatrix(Viewport(Width / 4, Height / 4, Width / 2, Height / 2));
+		// construct projection matrix
+		Matrix Projection(Matrix::Identity(4));
+		Projection[3][2] = -1. / (Eye - Center).norm();
+
+		// how to decide light direction?
+		// if camera is on z positive(out of screen), then light direction is (0, 0, -1) which point to screen.
+		//Vec3f LightDir = Vec3f(0, 0, -1);
+		//Vec3f LightDir = Vec3f(-1, -1, -3).normalize();
+		Vec3f LightDir = Vec3f(1, -1, 1).normalize();
+
+		// for each triangle in this model
+		for (int FaceIndex = 0; FaceIndex < ModelData.nfaces(); FaceIndex++)
+		{
+			std::vector<int> FaceData = ModelData.face(FaceIndex);
+			Vec3f TriangleScreen[3];
+			Vec3f TriangleWorld[3];
+			Vec2f UV[3];
+			float Intensity[3];
+			
+			for (int VertexIdx = 0; VertexIdx < 3; VertexIdx++)
+			{
+				// for each vertex in this triangle, do the transform.
+				Vec3f FaceVertex = ModelData.vert(FaceData[VertexIdx]);
+				TriangleScreen[VertexIdx] = Matrix2Vec(VPMatrix*Projection*ModelView*Vec2Matrix(FaceVertex));
+				TriangleWorld[VertexIdx] = FaceVertex;
+
+				// compute vertex intensity.
+				Vec3f VertexNormal = ModelData.norm(FaceIndex, VertexIdx);
+				Intensity[VertexIdx] = LightDir*VertexNormal;
+
+				// Note here intensity could be negative, in this case it should be zero.
+				// handle it in TGAColor operation.
+				//if (Intensity[VertexIdx] < 0.f)
+				//	Intensity[VertexIdx] = 0.f;
+
+				// uv
+				UV[VertexIdx] = ModelData.uv(FaceIndex, VertexIdx);
+			}
+
+			// given triangle's transformed vertex/uv/intensity, draw.
+			Line::DrawAndFillTriangle3D_GouraudShading(TriangleScreen, UV, Intensity, ZBuffer, InImage);
+		}
+
+		delete[] ZBuffer;
+	}
 }
 
 int main(int argc, char** argv) 
@@ -443,7 +505,8 @@ int main(int argc, char** argv)
 	//RasterizeWithYBufferTest(image);
 
 	//MatrixOperationTest(image);
-	DrawModelWithPerspectiveProjection(800, 800, image);
+	//DrawModelWithPerspectiveProjection(800, 800, image);
+	DrawModelGouraudShading(800, 800, image);
 
 	image.flip_vertically(); // i want to have the origin at the left bottom corner of the image
 	image.write_tga_file("output.tga");

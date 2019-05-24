@@ -434,6 +434,8 @@ public:
 				// take into account z-buffer.
 				// z-buffer is 2-dimension(width*height), make it 1D array.
 				// compute pixel's z value by barycentric coordinates multiply triangle's vertice's z value.
+				// note BarycentricVec is current pixel's barycentric coordinates, here we want current pixel's z value,
+				// so use 3 vertex's z value multiply with its barycentric value.
 				CurrentPoint.z = InVert[0].z*BarycentricVec.x +
 					InVert[1].z*BarycentricVec.y +
 					InVert[2].z*BarycentricVec.z;
@@ -445,8 +447,78 @@ public:
 					// pass Model as argument of this function to fetch diffuse data.
 					TGAColor Color = InModel.diffuse(InterpolatedUV);
 					// pass in color to get original intensity by InColor/255.
-					InImage.set(X, Y, TGAColor(Color.r*InColor.r / 255, Color.g*InColor.g / 255, Color.b*InColor.b / 255));
+					InImage.set(X, Y, TGAColor(Color.bgra[0]*InColor.bgra[0] / 255, Color.bgra[1] *InColor.bgra[1] / 255, Color.bgra[2] *InColor.bgra[2] / 255));
 					//InImage.set(X, Y, InColor);
+				}
+			}
+		}
+	}
+
+	// refactor DrawAndFillTriangle3DWithZBuffer_BoundingBox to interpolate light intensity of pixel.
+	// input: one triangle's vertex/uv/intensity.
+	static void DrawAndFillTriangle3D_GouraudShading(Vec3f* InVert, Vec2f* InUVs, float* InIntensity, float* InZBuffer, TGAImage &InImage)
+	{
+		// find bounding box of triangle by give 3 points.
+		// a bounding box is defined by 2 points: bottom left and upper right of box containing triangle.
+		// to find these corner points, iterate through 3 vertices of the triangle and choose min/max coordinates.
+		Vec2f BBoxMin(0, 0);
+		Vec2f BBoxMax(InImage.get_width(), InImage.get_height());
+
+		// find triangle vertices' min X/Y and max X/Y
+		// also need to consider triangle may out of image box.
+		std::vector<Vec3f> Triangle;
+		for (int index = 0; index < 3; index++)
+		{
+			Triangle.push_back(InVert[index]);
+		}
+
+		// find min/max x/y of 3 vertices of this triangle
+		std::sort(Triangle.begin(), Triangle.end(), [](Vec3f a, Vec3f b) {return a.y > b.y; });
+		BBoxMax.y = std::min((float)InImage.get_height(), Triangle[0].y);
+		BBoxMin.y = std::max(0.f, Triangle[2].y);
+
+		std::sort(Triangle.begin(), Triangle.end(), [](Vec3f a, Vec3f b) {return a.x > b.x; });
+		BBoxMax.x = std::min((float)InImage.get_width(), Triangle[0].x);
+		BBoxMin.x = std::max(0.f, Triangle[2].x);
+
+		// for each pixel in this bounding box, test point if it is inside triangle, if yes draw pixel.
+		for (int X = BBoxMin.x; X < BBoxMax.x; X++)
+		{
+			for (int Y = BBoxMin.y; Y < BBoxMax.y; Y++)
+			{
+				Vec3f CurrentPoint(X, Y, 0);
+				Vec3f BarycentricVec = ComputeBarycentric3D(InVert, CurrentPoint);
+
+				if (BarycentricVec.x < 0 || BarycentricVec.y < 0 || BarycentricVec.z < 0)
+				{
+					continue;
+				}
+
+				// below handle pixel inside this triangle.
+				// interpolate pixel uv.
+				Vec2f InterpolatedUV;
+				InterpolatedUV.x = InUVs[0].x * BarycentricVec.x +
+					InUVs[1].x * BarycentricVec.y +
+					InUVs[2].x * BarycentricVec.z;
+				InterpolatedUV.y = InUVs[0].y * BarycentricVec.x +
+					InUVs[1].y * BarycentricVec.y +
+					InUVs[2].y * BarycentricVec.z;
+
+				// interpolate pixel intensity. this allows smooth face color.
+				float InterpolatedIntensity = InIntensity[0] * BarycentricVec.x +
+					InIntensity[1] * BarycentricVec.y +
+					InIntensity[2] * BarycentricVec.z;
+
+				// interpolate pixel z buffer
+				CurrentPoint.z = InVert[0].z*BarycentricVec.x +
+					InVert[1].z*BarycentricVec.y +
+					InVert[2].z*BarycentricVec.z;
+
+				int CurrentPointZBufferIndex = InImage.get_width()*Y + X;
+				if (InZBuffer[CurrentPointZBufferIndex] < CurrentPoint.z)
+				{
+					InZBuffer[CurrentPointZBufferIndex] = CurrentPoint.z;
+					InImage.set(X, Y, TGAColor(255, 255, 255) * InterpolatedIntensity);
 				}
 			}
 		}
