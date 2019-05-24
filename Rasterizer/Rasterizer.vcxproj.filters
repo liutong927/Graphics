@@ -26,14 +26,20 @@
     <ClInclude Include="Utils\tgaimage.h">
       <Filter>Utils</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Line.h">
-      <Filter>Source</Filter>
-    </ClInclude>
     <ClInclude Include="Utils\model.h">
       <Filter>Utils</Filter>
     </ClInclude>
     <ClInclude Include="Utils\geometry.h">
       <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\GL_Line.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\GL_Triangle.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\GL_Transform.h">
+      <Filter>Source</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

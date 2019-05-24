@@ -116,7 +116,9 @@
     <ClCompile Include="Utils\tgaimage.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\Line.h" />
+    <ClInclude Include="Source\GL_Line.h" />
+    <ClInclude Include="Source\GL_Transform.h" />
+    <ClInclude Include="Source\GL_Triangle.h" />
     <ClInclude Include="Utils\geometry.h" />
     <ClInclude Include="Utils\model.h" />
     <ClInclude Include="Utils\tgaimage.h" />
