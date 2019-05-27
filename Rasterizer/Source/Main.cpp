@@ -391,10 +391,14 @@ namespace
 		Projection = Transform::Projection(-1. / (Eye - Center).norm());
 		LightDir.normalize();
 
+		Uniform_M = Projection*ModelView;
+		Uniform_MIT = Uniform_M.Transpose().Inverse();
+
 		//FlatShader Shader;
 		//GouraudShader Shader;
 		//ToonShader Shader;
-		FullShader Shader;
+		//GouraudShader_Diffuse Shader;
+		GouraudShader_NormalMapping Shader;
 		// for each triangle in this model
 		for (int FaceIndex = 0; FaceIndex < ModelData->nfaces(); FaceIndex++)
 		{

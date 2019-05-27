@@ -57,6 +57,7 @@ public:
 		Vec3f FaceVertex = ModelData->vert(InFaceIndex, InVertexIndex);
 		FaceVertex = Transform::Matrix2Vec(VPMatrix*Projection*ModelView*Transform::Vec2Matrix(FaceVertex));
 		Vec3f VertexNormal = ModelData->norm(InFaceIndex, InVertexIndex);
+		// still compute light intensity per vertex.
 		VaryingIntensity.raw[InVertexIndex] = std::max(0.f, LightDir*VertexNormal);
 		return FaceVertex;
 	}
@@ -126,16 +127,17 @@ private:
 };
 
 // Gouraud Shader with uv
-class FullShader :public IShader
+class GouraudShader_Diffuse :public IShader
 {
 public:
-	virtual ~FullShader() {};
+	virtual ~GouraudShader_Diffuse() {};
 
 	virtual Vec3f Vertex(int InFaceIndex, int InVertexIndex) override
 	{
 		Vec3f FaceVertex = ModelData->vert(InFaceIndex, InVertexIndex);
 		FaceVertex = Transform::Matrix2Vec(VPMatrix*Projection*ModelView*Transform::Vec2Matrix(FaceVertex));
 		Vec3f VertexNormal = ModelData->norm(InFaceIndex, InVertexIndex);
+		// still compute light intensity per vertex.
 		VaryingIntensity.raw[InVertexIndex] = std::max(0.f, LightDir*VertexNormal);
 
 		UVs[InVertexIndex] = ModelData->uv(InFaceIndex, InVertexIndex);
@@ -164,6 +166,84 @@ private:
 	// computed by vertex shader, read by fragment shader.
 	// each intensity value of triangle's vertex.
 	Vec3f VaryingIntensity;
+	Vec2f UVs[3];
+};
+
+// Gouraud Shader with normal mapping/specular mapping.
+// previous method is to use normal data of each vertex and interpolate pixel's normal.
+// if normal data of each pixel is stored in normal map, then we can use directly.
+class GouraudShader_NormalMapping :public IShader
+{
+public:
+	virtual ~GouraudShader_NormalMapping() {};
+
+	virtual Vec3f Vertex(int InFaceIndex, int InVertexIndex) override
+	{
+		Vec3f FaceVertex = ModelData->vert(InFaceIndex, InVertexIndex);
+		FaceVertex = Transform::Matrix2Vec(VPMatrix*Projection*ModelView*Transform::Vec2Matrix(FaceVertex));
+
+		UVs[InVertexIndex] = ModelData->uv(InFaceIndex, InVertexIndex);
+		return FaceVertex;
+	}
+
+	virtual bool Fragment(Vec3f InBarycentric, TGAColor& OutColor) override
+	{
+		Vec2f InterpolatedUV;
+		InterpolatedUV.x = UVs[0].x * InBarycentric.x +
+			UVs[1].x * InBarycentric.y +
+			UVs[2].x * InBarycentric.z;
+		InterpolatedUV.y = UVs[0].y * InBarycentric.x +
+			UVs[1].y * InBarycentric.y +
+			UVs[2].y * InBarycentric.z;
+
+		TGAColor BaseColor = ModelData->diffuse(InterpolatedUV);
+
+		// transform normals from normal map
+		Vec3f TransformNormal =  Transform::Matrix2Vec(Uniform_MIT*Transform::Vec2Matrix(ModelData->normal(InterpolatedUV))).normalize();
+		Vec3f TransformLight = Transform::Matrix2Vec(Uniform_M*Transform::Vec2Matrix(LightDir)).normalize();
+
+		// phong light model
+		float AmbientLight = 5.;
+
+		// specular mapping texture stores the value of each pixel's glossy factor.
+		// compute reflected light
+		Vec3f ReflectedLight = (TransformNormal*(TransformNormal*TransformLight*2.f) - TransformLight).normalize();
+		float SpecularIntensity = std::pow(std::max(0.f, ReflectedLight.z), ModelData->specular(InterpolatedUV));
+		// diffuse intensity
+		float DiffuseIntensity = std::max(0.f, TransformNormal*TransformLight);
+
+		for (int Idx = 0; Idx < 3; Idx++)
+		{
+			OutColor.bgra[Idx] = std::min<float>(AmbientLight + BaseColor.bgra[Idx] * (DiffuseIntensity + 0.6*SpecularIntensity), 255);
+		}
+		return false;
+	}
+
+private:
+	Vec2f UVs[3];
+};
+
+// TODO:Phong Shading. using normal map tangent space.
+class PhongShader_TangentSpace :public IShader
+{
+public:
+	virtual ~PhongShader_TangentSpace() {};
+
+	virtual Vec3f Vertex(int InFaceIndex, int InVertexIndex) override
+	{
+		Vec3f FaceVertex = ModelData->vert(InFaceIndex, InVertexIndex);
+		FaceVertex = Transform::Matrix2Vec(VPMatrix*Projection*ModelView*Transform::Vec2Matrix(FaceVertex));
+
+		UVs[InVertexIndex] = ModelData->uv(InFaceIndex, InVertexIndex);
+		return FaceVertex;
+	}
+
+	virtual bool Fragment(Vec3f InBarycentric, TGAColor& OutColor) override
+	{
+		return false;
+	}
+
+private:
 	Vec2f UVs[3];
 };
 

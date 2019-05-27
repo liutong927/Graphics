@@ -57,6 +57,9 @@ Model::Model(const char *filename) : verts_(), faces_() {
 	std::cerr << "# v# " << verts_.size() << " f# " << faces_.size() << std::endl;
 
 	load_texture(filename, "_diffuse.tga", diffusemap_);
+	load_texture(filename, "_nm.tga", normalmap_);
+	//load_texture(filename, "_nm_tangent.tga", normalmap_);
+	load_texture(filename, "_spec.tga", specularmap_);
 }
 
 Model::~Model() {
@@ -95,8 +98,26 @@ Vec3f Model::norm(int iface, int nthvert)
 	return norms_[faces_[iface][nthvert].raw[2]].normalize();
 }
 
+Vec3f Model::normal(Vec2f uvf) 
+{
+	Vec2i uv(uvf.x * normalmap_.get_width(), uvf.y * normalmap_.get_height());
+	TGAColor c = normalmap_.get(uv.x, uv.y);
+	Vec3f res;
+	for (int i = 0; i < 3; i++)
+	{
+		res.raw[2 - i] = (float)c.bgra[i] / 255.f*2.f - 1.f;
+	}
+
+	return res;
+}
+
 TGAColor Model::diffuse(Vec2f uvf)
 {
 	Vec2i uv(uvf.raw[0] * diffusemap_.get_width(), uvf.raw[1] * diffusemap_.get_height());
 	return diffusemap_.get(uv.raw[0], uv.raw[1]);
+}
+
+float Model::specular(Vec2f uvf) {
+	Vec2i uv(uvf.raw[0] * specularmap_.get_width(), uvf.raw[1] * specularmap_.get_height());
+	return specularmap_.get(uv.raw[0], uv.raw[1]).bgra[0] / 1.f;
 }
