@@ -80,6 +80,11 @@ Vec3f Model::vert(int i) {
 	return verts_[i];
 }
 
+Vec3f Model::vert(int iface, int nthvert)
+{
+	return verts_[faces_[iface][nthvert].raw[0]];
+}
+
 Vec2f Model::uv(int iface, int nthvert)
 {
 	return uv_[faces_[iface][nthvert].raw[1]];

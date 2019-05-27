@@ -5,6 +5,7 @@
 #define _USE_MATH_DEFINES // need to define to use M_PI.
 #include <math.h>
 
+#include "GL_Global.h"
 #include "GL_Line.h"
 #include "GL_Triangle.h"
 #include "GL_Transform.h"
@@ -330,6 +331,7 @@ namespace
 		Matrix Projection(Transform::Projection(-1. / (Eye - Center).norm()));
 
 		// how to decide light direction?
+		// note light direction has nothing to do with the camera, it is set by user wish.
 		// if camera is on z positive(out of screen), then light direction is (0, 0, -1) which point to screen.
 		//Vec3f LightDir = Vec3f(0, 0, -1);
 		//Vec3f LightDir = Vec3f(-1, -1, -3).normalize();
@@ -370,6 +372,48 @@ namespace
 
 		delete[] ZBuffer;
 	}
+
+	void DrawModelByShader(TGAImage& InImage)
+	{
+		// parse model file .obj using utils class Model.
+		ModelData = new Model("F:\\workdir\\personal\\Rasterizer\\Resource\\african_head.obj");
+		int InWidth = InImage.get_width();
+		int InHeight = InImage.get_height();
+
+		float* ZBuffer = new float[InWidth*InHeight];
+		for (int Index = 0; Index < InWidth*InHeight; Index++)
+		{
+			ZBuffer[Index] = -std::numeric_limits<float>::max();
+		}
+
+		ModelView = Transform::LookAt(Eye, Center, Vec3f(0, 1, 0));
+		VPMatrix = Transform::Viewport(Width / 4, Height / 4, Width / 2, Height / 2);
+		Projection = Transform::Projection(-1. / (Eye - Center).norm());
+		LightDir.normalize();
+
+		//FlatShader Shader;
+		//GouraudShader Shader;
+		//ToonShader Shader;
+		FullShader Shader;
+		// for each triangle in this model
+		for (int FaceIndex = 0; FaceIndex < ModelData->nfaces(); FaceIndex++)
+		{
+			std::vector<int> FaceData = ModelData->face(FaceIndex);
+			Vec3f TriangleScreen[3];
+
+			// call each vertex's vertex shader.
+			for (int VertexIdx = 0; VertexIdx < 3; VertexIdx++)
+			{
+				TriangleScreen[VertexIdx] = Shader.Vertex(FaceIndex, VertexIdx);
+			}
+
+			// do the rasterization.
+			Triangle::DrawAndFillTriangleWithShader(TriangleScreen, Shader, ZBuffer, InImage);
+		}
+
+		delete[] ZBuffer;
+		delete ModelData;
+	}
 }
 
 int main(int argc, char** argv) 
@@ -384,7 +428,9 @@ int main(int argc, char** argv)
 
 	//MatrixOperationTest(image);
 	//DrawModelWithPerspectiveProjection(Width, Height, image);
-	DrawModelGouraudShading(Width, Height, image);
+	//DrawModelGouraudShading(Width, Height, image);
+	
+	DrawModelByShader(image);
 
 	image.flip_vertically(); // i want to have the origin at the left bottom corner of the image
 	image.write_tga_file("output.tga");

@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include "GL_Line.h"
+#include "GL_Shader.h"
 
 class Triangle
 {
@@ -402,6 +403,63 @@ public:
 				{
 					InZBuffer[CurrentPointZBufferIndex] = CurrentPoint.z;
 					InImage.set(X, Y, TGAColor(255, 255, 255) * InterpolatedIntensity);
+				}
+			}
+		}
+	}
+
+	// refactor DrawAndFillTriangle3D_GouraudShading to do triangle rasterization for arbitary shader. 
+	static void DrawAndFillTriangleWithShader(Vec3f* InScreenVert, IShader& InShader, float* InZBuffer, TGAImage &InImage)
+	{
+		// find bounding box of triangle by give 3 points.
+		// a bounding box is defined by 2 points: bottom left and upper right of box containing triangle.
+		// to find these corner points, iterate through 3 vertices of the triangle and choose min/max coordinates.
+		Vec2f BBoxMin(0, 0);
+		Vec2f BBoxMax(InImage.get_width(), InImage.get_height());
+
+		// find triangle vertices' min X/Y and max X/Y
+		// also need to consider triangle may out of image box.
+		std::vector<Vec3f> Triangle;
+		for (int index = 0; index < 3; index++)
+		{
+			Triangle.push_back(InScreenVert[index]);
+		}
+
+		// find min/max x/y of 3 vertices of this triangle
+		std::sort(Triangle.begin(), Triangle.end(), [](Vec3f a, Vec3f b) {return a.y > b.y; });
+		BBoxMax.y = std::min((float)InImage.get_height(), Triangle[0].y);
+		BBoxMin.y = std::max(0.f, Triangle[2].y);
+
+		std::sort(Triangle.begin(), Triangle.end(), [](Vec3f a, Vec3f b) {return a.x > b.x; });
+		BBoxMax.x = std::min((float)InImage.get_width(), Triangle[0].x);
+		BBoxMin.x = std::max(0.f, Triangle[2].x);
+
+		// for each pixel in this bounding box, test point if it is inside triangle, if yes draw pixel.
+		for (int X = BBoxMin.x; X < BBoxMax.x; X++)
+		{
+			for (int Y = BBoxMin.y; Y < BBoxMax.y; Y++)
+			{
+				Vec3f CurrentPoint(X, Y, 0);
+				Vec3f BarycentricVec = ComputeBarycentric3D(InScreenVert, CurrentPoint);
+				int CurrentPointZBufferIndex = InImage.get_width()*Y + X;
+
+				// interpolate pixel z buffer
+				CurrentPoint.z = InScreenVert[0].z*BarycentricVec.x +
+					InScreenVert[1].z*BarycentricVec.y +
+					InScreenVert[2].z*BarycentricVec.z;
+
+				if (BarycentricVec.x < 0 || BarycentricVec.y < 0 || BarycentricVec.z < 0
+					|| InZBuffer[CurrentPointZBufferIndex] > CurrentPoint.z)
+				{
+					continue;
+				}
+
+				TGAColor PixelColor;
+				bool bDiscard = InShader.Fragment(BarycentricVec, PixelColor);
+				if (!bDiscard)
+				{
+					InZBuffer[CurrentPointZBufferIndex] = CurrentPoint.z;
+					InImage.set(X, Y, PixelColor);
 				}
 			}
 		}
