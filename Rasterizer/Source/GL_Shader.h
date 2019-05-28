@@ -199,6 +199,7 @@ public:
 		TGAColor BaseColor = ModelData->diffuse(InterpolatedUV);
 
 		// transform normals from normal map
+		// note normal map here is stored per pixel...so obtain pixel's normal directly and compute light intensity.
 		Vec3f TransformNormal =  Transform::Matrix2Vec(Uniform_MIT*Transform::Vec2Matrix(ModelData->normal(InterpolatedUV))).normalize();
 		Vec3f TransformLight = Transform::Matrix2Vec(Uniform_M*Transform::Vec2Matrix(LightDir)).normalize();
 
@@ -223,7 +224,67 @@ private:
 	Vec2f UVs[3];
 };
 
+// Phong Shading.
+// Gouraud shading is calculate light per vertex and then do interpolation.
+// Phong shading is calculate light per pixel.
+class PhongShader :public IShader
+{
+public:
+	virtual ~PhongShader() {};
+
+	virtual Vec3f Vertex(int InFaceIndex, int InVertexIndex) override
+	{
+		Vec3f FaceVertex = ModelData->vert(InFaceIndex, InVertexIndex);
+		FaceVertex = Transform::Matrix2Vec(VPMatrix*Projection*ModelView*Transform::Vec2Matrix(FaceVertex));
+
+		Normals[InVertexIndex] = Transform::Matrix2Vec(Uniform_MIT*Transform::Vec2Matrix(ModelData->norm(InFaceIndex, InVertexIndex))).normalize();
+
+		UVs[InVertexIndex] = ModelData->uv(InFaceIndex, InVertexIndex);
+		return FaceVertex;
+	}
+
+	virtual bool Fragment(Vec3f InBarycentric, TGAColor& OutColor) override
+	{
+		// todo: can simplify the code by introduce matrix compuation here
+		// (UVs-2*3matrix, then directly multiply with Vec3f-3*1matrix, thus InterpolatedUV-2*1matrix[vec2f]).
+		Vec2f InterpolatedUV;
+		InterpolatedUV.x = UVs[0].x * InBarycentric.x +
+			UVs[1].x * InBarycentric.y +
+			UVs[2].x * InBarycentric.z;
+		InterpolatedUV.y = UVs[0].y * InBarycentric.x +
+			UVs[1].y * InBarycentric.y +
+			UVs[2].y * InBarycentric.z;
+
+		// note here pixel's normal is interpolated, then used to compute light intensity.
+		Vec3f InterpolatedNormal;
+		InterpolatedNormal.x = Normals[0].x * InBarycentric.x +
+			Normals[1].x * InBarycentric.y +
+			Normals[2].x * InBarycentric.z;
+		InterpolatedNormal.y = Normals[0].y * InBarycentric.x +
+			Normals[1].y * InBarycentric.y +
+			Normals[2].y * InBarycentric.z;
+		InterpolatedNormal.z = Normals[0].z * InBarycentric.x +
+			Normals[1].z * InBarycentric.y +
+			Normals[2].z * InBarycentric.z;
+
+		InterpolatedNormal.normalize();
+		float Intensity = std::max(0.f, InterpolatedNormal*LightDir);
+
+		TGAColor BaseColor = ModelData->diffuse(InterpolatedUV);
+		OutColor = BaseColor*Intensity;
+
+		return false;
+	}
+
+private:
+	Vec2f UVs[3];
+	Vec3f Normals[3];
+};
+
+
 // TODO:Phong Shading. using normal map tangent space.
+// Gouraud shading is calculate light per vertex and then do interpolation.
+// Phong shading is calculate light per pixel.
 class PhongShader_TangentSpace :public IShader
 {
 public:

@@ -398,7 +398,8 @@ namespace
 		//GouraudShader Shader;
 		//ToonShader Shader;
 		//GouraudShader_Diffuse Shader;
-		GouraudShader_NormalMapping Shader;
+		//GouraudShader_NormalMapping Shader;
+		PhongShader Shader;
 		// for each triangle in this model
 		for (int FaceIndex = 0; FaceIndex < ModelData->nfaces(); FaceIndex++)
 		{

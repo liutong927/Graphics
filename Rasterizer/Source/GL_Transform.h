@@ -14,13 +14,13 @@ public:
 	}
 
 	// vec3f to 4*1 matrix.
-	static Matrix Vec2Matrix(Vec3f InVec)
+	static Matrix Vec2Matrix(Vec3f InVec, float InFill = 1.f)
 	{
 		Matrix Result(4, 1);
 		Result[0][0] = InVec.x;
 		Result[1][0] = InVec.y;
 		Result[2][0] = InVec.z;
-		Result[3][0] = 1.f;
+		Result[3][0] = InFill;
 
 		return Result;
 	}
