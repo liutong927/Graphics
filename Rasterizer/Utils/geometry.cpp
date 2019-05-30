@@ -13,6 +13,18 @@ Matrix::Matrix(int InRow /*= 4*/, int InCol /*= 4*/):
 {
 }
 
+void Matrix::SetRow(size_t InRowIdx, Vec3f InVec)
+{
+	assert(InRowIdx < Rows);
+	for (size_t i = Cols; i--; Elements[InRowIdx][i] = InVec.raw[i]);
+}
+
+void Matrix::SetCol(size_t InColIdx, Vec3f InVec)
+{
+	assert(InColIdx < Cols);
+	for (size_t i = Rows; i--; Elements[i][InColIdx] = InVec.raw[i]);
+}
+
 Matrix Matrix::Identity(int InDimensions)
 {
 	Matrix IMatrix(InDimensions, InDimensions);

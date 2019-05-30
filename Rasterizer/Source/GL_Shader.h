@@ -200,7 +200,10 @@ public:
 
 		// transform normals from normal map
 		// note normal map here is stored per pixel...so obtain pixel's normal directly and compute light intensity.
+		// this normal map is stored in model coordinates, NOT tangent space.
+		// to get normal in projection space, we need to recompute normal, it is inverse transposed matrix to keep it still "normal".
 		Vec3f TransformNormal =  Transform::Matrix2Vec(Uniform_MIT*Transform::Vec2Matrix(ModelData->normal(InterpolatedUV))).normalize();
+		// for light vector, we apply projection transform to it, note it is different from normal vector transform.
 		Vec3f TransformLight = Transform::Matrix2Vec(Uniform_M*Transform::Vec2Matrix(LightDir)).normalize();
 
 		// phong light model
@@ -235,76 +238,99 @@ public:
 	virtual Vec3f Vertex(int InFaceIndex, int InVertexIndex) override
 	{
 		Vec3f FaceVertex = ModelData->vert(InFaceIndex, InVertexIndex);
-		FaceVertex = Transform::Matrix2Vec(VPMatrix*Projection*ModelView*Transform::Vec2Matrix(FaceVertex));
 
-		Normals[InVertexIndex] = Transform::Matrix2Vec(Uniform_MIT*Transform::Vec2Matrix(ModelData->norm(InFaceIndex, InVertexIndex))).normalize();
+		// store triangle's vertices in view space.
+		VaryingTriangle[InVertexIndex] = Transform::Matrix2Vec(Uniform_M*Transform::Vec2Matrix(FaceVertex));
 
-		UVs[InVertexIndex] = ModelData->uv(InFaceIndex, InVertexIndex);
+		FaceVertex = Transform::Matrix2Vec(VPMatrix*Uniform_M*Transform::Vec2Matrix(FaceVertex));
+
+		// here stores vertex normals from view space.
+		VaryingNormals[InVertexIndex] = Transform::Matrix2VecForV(Uniform_MIT*Transform::Vec2Matrix(ModelData->norm(InFaceIndex, InVertexIndex), 0.f)).normalize();
+
+		VaryingUVs[InVertexIndex] = ModelData->uv(InFaceIndex, InVertexIndex);
 		return FaceVertex;
 	}
 
 	virtual bool Fragment(Vec3f InBarycentric, TGAColor& OutColor) override
 	{
-		// todo: can simplify the code by introduce matrix compuation here
+		// todo: can simplify the code by introduce matrix computation here
 		// (UVs-2*3matrix, then directly multiply with Vec3f-3*1matrix, thus InterpolatedUV-2*1matrix[vec2f]).
 		Vec2f InterpolatedUV;
-		InterpolatedUV.x = UVs[0].x * InBarycentric.x +
-			UVs[1].x * InBarycentric.y +
-			UVs[2].x * InBarycentric.z;
-		InterpolatedUV.y = UVs[0].y * InBarycentric.x +
-			UVs[1].y * InBarycentric.y +
-			UVs[2].y * InBarycentric.z;
+		InterpolatedUV.x = VaryingUVs[0].x * InBarycentric.x +
+			VaryingUVs[1].x * InBarycentric.y +
+			VaryingUVs[2].x * InBarycentric.z;
+		InterpolatedUV.y = VaryingUVs[0].y * InBarycentric.x +
+			VaryingUVs[1].y * InBarycentric.y +
+			VaryingUVs[2].y * InBarycentric.z;
 
 		// note here pixel's normal is interpolated, then used to compute light intensity.
 		Vec3f InterpolatedNormal;
-		InterpolatedNormal.x = Normals[0].x * InBarycentric.x +
-			Normals[1].x * InBarycentric.y +
-			Normals[2].x * InBarycentric.z;
-		InterpolatedNormal.y = Normals[0].y * InBarycentric.x +
-			Normals[1].y * InBarycentric.y +
-			Normals[2].y * InBarycentric.z;
-		InterpolatedNormal.z = Normals[0].z * InBarycentric.x +
-			Normals[1].z * InBarycentric.y +
-			Normals[2].z * InBarycentric.z;
+		InterpolatedNormal.x = VaryingNormals[0].x * InBarycentric.x +
+			VaryingNormals[1].x * InBarycentric.y +
+			VaryingNormals[2].x * InBarycentric.z;
+		InterpolatedNormal.y = VaryingNormals[0].y * InBarycentric.x +
+			VaryingNormals[1].y * InBarycentric.y +
+			VaryingNormals[2].y * InBarycentric.z;
+		InterpolatedNormal.z = VaryingNormals[0].z * InBarycentric.x +
+			VaryingNormals[1].z * InBarycentric.y +
+			VaryingNormals[2].z * InBarycentric.z;
+		//InterpolatedNormal.normalize();
 
-		InterpolatedNormal.normalize();
-		float Intensity = std::max(0.f, InterpolatedNormal*LightDir);
+		// now we need transform pixel normal in normal map from tangent space to world space.
+		// so first we need to know how tangent space basis(TBN coordinates) represented in world space.
+		// then TBN matrix(3*3) [tranform tangent basis in world] multiply with Normal in tangent space, to get normal in world.
 
+		// we have world vertex coordinates vt0, vt1, vt2, and its uv coordinates uv0, uv1, uv2.
+		// note uv coordinates is defined in tangent space. u is along tangent direction, v is bitangent direction.
+		// triangle's two edge (vt1-vt0) and (vt2-vt0) can be described in TBN coordinates. N is vertical to triangle's plane.
+		// (vt1-vt0) = (u1-u0)*T + (v1-v0)*B + 0*N = (uv1.x-uv0.x)*T + (uv1.y-uv0.y)*B
+		// (vt2-vt0) = (u2-u0)*T + (v2-v0)*B + 0*N = (uv2.x-uv0.x)*T + (uv2.y-uv0.y)*B
+		// pixel's normal(InterpolatedNormal) is as N axis, so
+		// InterpolatedNormal = 0*T + 0*B + N
+		// now we can construct matrix to compute basis for TBN. and also since we need all vertices of this triangle,
+		// we need to store them in vertex shader stage.
+		// the matrix is like: 3 vector in world(3*3) = 3 vector in uv(tangent) space(3*3) * TBN basis in world(3*3)
+
+		// we have triangle in world coordinates. Tri_W
+		// we must normalize matrix, why?
+		Matrix TriangleInWorld(3, 3);
+		TriangleInWorld.SetRow(0, (VaryingTriangle[1] - VaryingTriangle[0]).normalize());
+		TriangleInWorld.SetRow(1, (VaryingTriangle[2] - VaryingTriangle[0]).normalize());
+		TriangleInWorld.SetRow(2, InterpolatedNormal.normalize());
+
+		// also have triangle in tangent space. Tri_T
+		Matrix TriangleTangent(3, 3);
+		TriangleTangent.SetRow(0, Vec3f(VaryingUVs[1] - VaryingUVs[0]).normalize());
+		TriangleTangent.SetRow(1, Vec3f(VaryingUVs[2] - VaryingUVs[0]).normalize());
+		TriangleTangent.SetRow(2, Vec3f(0, 0, 1));// note here TBN is ortho coordinate, N axis is (0,0,1) in this frame.
+
+		// Define TBN_toW, Tri_W = Tri_T * TBN_toW. // why not Tri_W =  TBN_toW * Tri_T????
+		// TBN_toW = (Tri_T)^-1 * Tri_W.
+		Matrix TBN(3, 3);
+		TBN = TriangleTangent.Inverse()*TriangleInWorld;
+
+		Matrix NormalInWorldM(1, 3);
+		// compute normal data in world coordinate, note matrix multiplication order matters!!
+		NormalInWorldM = Transform::Vec2Matrix13(ModelData->normal(InterpolatedUV))*TBN;
+		Vec3f NormalInWorld(NormalInWorldM[0][0], NormalInWorldM[0][1], NormalInWorldM[0][2]);
+		NormalInWorld.normalize();
+
+		// don't forget to transform light to view space.
+		Vec3f TransformLight = Transform::Matrix2VecForV(Uniform_M*Transform::Vec2Matrix(LightDir, 0.f)).normalize();
+		float Intensity = std::max(0.f, NormalInWorld*TransformLight);
+		//float Intensity = std::max(0.f, InterpolatedNormal*TransformLight);// this one using interpolated normal for pixel, but not use normal map data.
 		TGAColor BaseColor = ModelData->diffuse(InterpolatedUV);
+		//TGAColor BaseColor = TGAColor(255, 255, 255);
 		OutColor = BaseColor*Intensity;
 
+		// why after all this, we still get black triangle in model???
+
 		return false;
 	}
 
 private:
-	Vec2f UVs[3];
-	Vec3f Normals[3];
+	Vec2f VaryingUVs[3];
+	Vec3f VaryingNormals[3];
+
+	Vec3f VaryingTriangle[3];
 };
-
-
-// TODO:Phong Shading. using normal map tangent space.
-// Gouraud shading is calculate light per vertex and then do interpolation.
-// Phong shading is calculate light per pixel.
-class PhongShader_TangentSpace :public IShader
-{
-public:
-	virtual ~PhongShader_TangentSpace() {};
-
-	virtual Vec3f Vertex(int InFaceIndex, int InVertexIndex) override
-	{
-		Vec3f FaceVertex = ModelData->vert(InFaceIndex, InVertexIndex);
-		FaceVertex = Transform::Matrix2Vec(VPMatrix*Projection*ModelView*Transform::Vec2Matrix(FaceVertex));
-
-		UVs[InVertexIndex] = ModelData->uv(InFaceIndex, InVertexIndex);
-		return FaceVertex;
-	}
-
-	virtual bool Fragment(Vec3f InBarycentric, TGAColor& OutColor) override
-	{
-		return false;
-	}
-
-private:
-	Vec2f UVs[3];
-};
-

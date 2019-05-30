@@ -16,6 +16,12 @@ void Model::load_texture(std::string filename, const char *suffix, TGAImage &img
 	}
 }
 
+void Model::load_texture(std::string filename, TGAImage &img)
+{
+	std::cerr << "texture file " << filename << " loading " << (img.read_tga_file(filename.c_str()) ? "ok" : "failed") << std::endl;
+	img.flip_vertically();
+}
+
 Model::Model(const char *filename) : verts_(), faces_() {
 	std::ifstream in;
 	in.open(filename, std::ifstream::in);
@@ -57,6 +63,9 @@ Model::Model(const char *filename) : verts_(), faces_() {
 	std::cerr << "# v# " << verts_.size() << " f# " << faces_.size() << std::endl;
 
 	load_texture(filename, "_diffuse.tga", diffusemap_);
+
+	// using grid texture.
+	//load_texture("F:\\workdir\\personal\\Rasterizer\\Resource\\grid.tga", diffusemap_);
 	//load_texture(filename, "_nm.tga", normalmap_);
 	load_texture(filename, "_nm_tangent.tga", normalmap_);
 	load_texture(filename, "_spec.tga", specularmap_);

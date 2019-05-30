@@ -31,6 +31,7 @@ private:
 	TGAImage specularmap_;
 
 	void load_texture(std::string filename, const char *suffix, TGAImage &img);
+	void load_texture(std::string filename, TGAImage &img);
 };
 
 #endif //__MODEL_H__

@@ -7,10 +7,16 @@ class Transform
 {
 public:
 
-	// 4*1 matrix to vec3f.
+	// 4*1 matrix to vec3f for point
 	static Vec3f Matrix2Vec(Matrix InMatrix)
 	{
 		return Vec3f(InMatrix[0][0] / InMatrix[3][0], InMatrix[1][0] / InMatrix[3][0], InMatrix[2][0] / InMatrix[3][0]);
+	}
+
+	// 4*1 matrix to vec3f for vector
+	static Vec3f Matrix2VecForV(Matrix InMatrix)
+	{
+		return Vec3f(InMatrix[0][0], InMatrix[1][0], InMatrix[2][0]);
 	}
 
 	// vec3f to 4*1 matrix.
@@ -21,6 +27,16 @@ public:
 		Result[1][0] = InVec.y;
 		Result[2][0] = InVec.z;
 		Result[3][0] = InFill;
+
+		return Result;
+	}
+
+	static Matrix Vec2Matrix13(Vec3f InVec)
+	{
+		Matrix Result(1, 3);
+		Result[0][0] = InVec.x;
+		Result[0][1] = InVec.y;
+		Result[0][2] = InVec.z;
 
 		return Result;
 	}
