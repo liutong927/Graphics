@@ -66,8 +66,8 @@ Model::Model(const char *filename) : verts_(), faces_() {
 
 	// using grid texture.
 	//load_texture("F:\\workdir\\personal\\Rasterizer\\Resource\\grid.tga", diffusemap_);
-	//load_texture(filename, "_nm.tga", normalmap_);
-	load_texture(filename, "_nm_tangent.tga", normalmap_);
+	load_texture(filename, "_nm.tga", normalmap_);
+	//load_texture(filename, "_nm_tangent.tga", normalmap_);
 	load_texture(filename, "_spec.tga", specularmap_);
 }
 

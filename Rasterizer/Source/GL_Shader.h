@@ -334,3 +334,123 @@ private:
 
 	Vec3f VaryingTriangle[3];
 };
+
+// Depth shader
+class DepthShader :public IShader
+{
+public:
+	virtual ~DepthShader() {};
+
+	virtual Vec3f Vertex(int InFaceIndex, int InVertexIndex) override
+	{
+		Vec3f FaceVertex = ModelData->vert(InFaceIndex, InVertexIndex);
+
+		// store triangle's vertices in view space.
+		VaryingTriangle[InVertexIndex] = Transform::Matrix2Vec(Uniform_M*Transform::Vec2Matrix(FaceVertex));
+		FaceVertex = Transform::Matrix2Vec(VPMatrix*Uniform_M*Transform::Vec2Matrix(FaceVertex));
+
+		return FaceVertex;
+	}
+
+	// currently this depth fragment shader is just for output depth image.
+	// the shadow buffer is computed outside.
+	virtual bool Fragment(Vec3f InBarycentric, TGAColor& OutColor) override
+	{
+		// compute current pixel's vertex.
+		Vec3f InterpolatedVertex;
+		InterpolatedVertex.x = VaryingTriangle[0].x*InBarycentric.x +
+			VaryingTriangle[1].x*InBarycentric.y + 
+			VaryingTriangle[2].x*InBarycentric.z;
+		InterpolatedVertex.y = VaryingTriangle[0].y*InBarycentric.x +
+			VaryingTriangle[1].y*InBarycentric.y +
+			VaryingTriangle[2].y*InBarycentric.z;
+		InterpolatedVertex.z = VaryingTriangle[0].z*InBarycentric.x +
+			VaryingTriangle[1].z*InBarycentric.y +
+			VaryingTriangle[2].z*InBarycentric.z;
+
+		// just output fragment's depth.
+		OutColor = TGAColor(TGAColor(255, 255, 255) * InterpolatedVertex.z);
+
+		return false;
+	}
+
+private:
+	Vec3f VaryingTriangle[3];
+};
+
+class ShadowShader :public IShader
+{
+public:
+	ShadowShader(Matrix InShadowM, Matrix InShadowMIT, Matrix InFrameToShadowM, float* InShadowBuffer) :
+		Uniform_Shadow_M(InShadowM), Uniform_Shadow_MIT(InShadowMIT), Uniform_FrameToShadow_M(InFrameToShadowM), ShadowBuffer(InShadowBuffer) {};
+
+	virtual ~ShadowShader() {};
+
+	virtual Vec3f Vertex(int InFaceIndex, int InVertexIndex) override
+	{
+		Vec3f FaceVertex = ModelData->vert(InFaceIndex, InVertexIndex);
+
+		FaceVertex = Transform::Matrix2Vec(VPMatrix*Uniform_Shadow_M*Transform::Vec2Matrix(FaceVertex));
+		VaryingTriangle[InVertexIndex] = FaceVertex;
+
+		VaryingUVs[InVertexIndex] = ModelData->uv(InFaceIndex, InVertexIndex);
+		return FaceVertex;
+	}
+
+	virtual bool Fragment(Vec3f InBarycentric, TGAColor& OutColor) override
+	{
+		Vec3f InterpolatedVertex;
+		InterpolatedVertex.x = VaryingTriangle[0].x*InBarycentric.x +
+			VaryingTriangle[1].x*InBarycentric.y +
+			VaryingTriangle[2].x*InBarycentric.z;
+		InterpolatedVertex.y = VaryingTriangle[0].y*InBarycentric.x +
+			VaryingTriangle[1].y*InBarycentric.y +
+			VaryingTriangle[2].y*InBarycentric.z;
+		InterpolatedVertex.z = VaryingTriangle[0].z*InBarycentric.x +
+			VaryingTriangle[1].z*InBarycentric.y +
+			VaryingTriangle[2].z*InBarycentric.z;
+
+		// we have screen coordinates in frame buffer(FaceVertex), now transform it to screen coordinates of shadow buffer.
+		Vec3f VertexInShadowBuffer = Transform::Matrix2Vec(Uniform_FrameToShadow_M*Transform::Vec2Matrix(InterpolatedVertex));
+		// then we can get shadow buffer index.
+		int ShadowBufferIndex = (int)VertexInShadowBuffer.x + (int)VertexInShadowBuffer.y*Width;
+		// we get current pixel's depth in screen buffer, if corresponding pixel in shadow buffer is less, then this pixel should be lit. 
+		// why????
+		float Shadow = 0.3f + 0.7f*(ShadowBuffer[ShadowBufferIndex] < VertexInShadowBuffer.z);
+
+		Vec2f InterpolatedUV;
+		InterpolatedUV.x = VaryingUVs[0].x * InBarycentric.x +
+			VaryingUVs[1].x * InBarycentric.y +
+			VaryingUVs[2].x * InBarycentric.z;
+		InterpolatedUV.y = VaryingUVs[0].y * InBarycentric.x +
+			VaryingUVs[1].y * InBarycentric.y +
+			VaryingUVs[2].y * InBarycentric.z;
+		
+		// use normal map in world space.
+		Vec3f TransformNormal = Transform::Matrix2Vec(Uniform_Shadow_MIT*Transform::Vec2Matrix(ModelData->normal(InterpolatedUV))).normalize();
+		Vec3f TransformLight = Transform::Matrix2Vec(Uniform_Shadow_M*Transform::Vec2Matrix(LightDir)).normalize();
+
+		float AmbientLight = 20.;
+		// compute reflected light
+		Vec3f ReflectedLight = (TransformNormal*(TransformNormal*TransformLight*2.f) - TransformLight).normalize();
+		float SpecularIntensity = std::pow(std::max(0.f, ReflectedLight.z), ModelData->specular(InterpolatedUV));
+		// diffuse intensity
+		float DiffuseIntensity = std::max(0.f, TransformNormal*TransformLight);
+
+		TGAColor BaseColor = ModelData->diffuse(InterpolatedUV);
+		for (int Idx = 0; Idx < 3; Idx++)
+		{
+			OutColor.bgra[Idx] = std::min<float>(AmbientLight + BaseColor.bgra[Idx] * Shadow* (1.2*DiffuseIntensity + 0.6*SpecularIntensity), 255);
+		}
+		return false;
+	}
+
+private:
+	Matrix Uniform_Shadow_M;
+	Matrix Uniform_Shadow_MIT;
+	Matrix Uniform_FrameToShadow_M; // transform framebuffer screen coordinates to shadowbuffer screen coordinates
+	Vec2f VaryingUVs[3];
+	Vec3f VaryingTriangle[3];
+
+	float* ShadowBuffer;
+};

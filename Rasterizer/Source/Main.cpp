@@ -18,13 +18,6 @@ const TGAColor blue = TGAColor(0, 0, 255, 255);
 
 namespace
 {
-	int Width = 800;
-	int Height = 800;
-
-	Vec3f Camera(0, 0, 3);
-	Vec3f Eye(1, 1, 3);
-	Vec3f Center(0, 0, 0);
-
 	//*************************************************************************
 	// Line/Triangle/Model Draw Test
 	//*************************************************************************
@@ -377,6 +370,7 @@ namespace
 	{
 		// parse model file .obj using utils class Model.
 		ModelData = new Model("F:\\workdir\\personal\\Rasterizer\\Resource\\african_head.obj");
+		//ModelData = new Model("F:\\workdir\\personal\\Rasterizer\\Resource\\diablo3_pose.obj");
 		int InWidth = InImage.get_width();
 		int InHeight = InImage.get_height();
 
@@ -420,6 +414,96 @@ namespace
 		delete[] ZBuffer;
 		delete ModelData;
 	}
+
+	void DrawModelWithShadow(TGAImage& InImage)
+	{
+		// parse model file .obj using utils class Model.
+		ModelData = new Model("F:\\workdir\\personal\\Rasterizer\\Resource\\diablo3_pose.obj");
+		int InWidth = InImage.get_width();
+		int InHeight = InImage.get_height();
+
+		TGAImage DepthImage(InWidth, InHeight, TGAImage::RGB);
+		float* ZBuffer = new float[InWidth*InHeight];
+		float* ShadowBuffer = new float[InWidth*InHeight];
+		for (int Index = 0; Index < InWidth*InHeight; Index++)
+		{
+			ShadowBuffer[Index] = ZBuffer[Index] = -std::numeric_limits<float>::max();
+		}
+
+		LightDir.normalize();
+		// now first look at light direction
+		ModelView = Transform::LookAt(LightDir, Center, Vec3f(0, 1, 0));
+		VPMatrix = Transform::Viewport(Width / 4, Height / 4, Width / 2, Height / 2);
+		//Projection = Transform::Projection(-1. / (Eye - Center).norm());
+		// why???
+		Projection = Transform::Projection(0);
+
+		Uniform_M = Projection*ModelView;
+		Uniform_MIT = Uniform_M.Transpose().Inverse();
+
+		// keep the object to screen transform of first pass.
+		Matrix ObjToScreenM = VPMatrix*Projection*ModelView;
+
+		// first pass is compute depth shader, to get the info which part was lit, which part was hidden.
+		// so the shadow buffer is z-buffer from light direction.
+		DepthShader FirstPassShader;
+
+		// for each triangle in this model
+		for (int FaceIndex = 0; FaceIndex < ModelData->nfaces(); FaceIndex++)
+		{
+			std::vector<int> FaceData = ModelData->face(FaceIndex);
+			Vec3f TriangleScreen[3];
+
+			// call each vertex's vertex shader.
+			for (int VertexIdx = 0; VertexIdx < 3; VertexIdx++)
+			{
+				TriangleScreen[VertexIdx] = FirstPassShader.Vertex(FaceIndex, VertexIdx);
+			}
+
+			// do the rasterization.
+			Triangle::DrawAndFillTriangleWithShader(TriangleScreen, FirstPassShader, ShadowBuffer, DepthImage);
+		}
+
+		// second pass shader
+		Matrix FrameModelView = Transform::LookAt(Eye, Center, Vec3f(0, 1, 0));
+		Matrix FrameVPMatrix = Transform::Viewport(Width / 4, Height / 4, Width / 2, Height / 2);
+		Matrix FrameProjection = Transform::Projection(-1. / (Eye - Center).norm());
+
+		Matrix Uniform_Frame_M = FrameProjection*FrameModelView;
+		Matrix Uniform_Frame_MIT = Uniform_Frame_M.Transpose().Inverse();
+
+		// same model vertex in model space, with different transform, we have different frame buffers.
+		// so Transform*vt = VinW; vt = (Transform)^-1*VinW
+		// (T1)^-1*V1 = (T2)^-1*V2, for space 1 and 2.
+		// assume transform from 1 to 2 is M12, then V2 = M12*V1;
+		// so M12 = T2*(T1)^-1.
+		// now we want to solve Frame buffer in Shadow buffer, means Uniform_FrameToShadow_M = Tshadow*(Tframe)^-1.
+		// we have local to screen transform Tshadow, which is ObjToScreenM.
+		// and also Tframe = VPMatrix*Uniform_M
+		Matrix Uniform_FrameToShadow_M = ObjToScreenM*(FrameVPMatrix*Uniform_Frame_M).Inverse();
+
+		ShadowShader SecondPassShader(Uniform_Frame_M, Uniform_Frame_MIT, Uniform_FrameToShadow_M, ShadowBuffer);
+
+		// for each triangle in this model
+		for (int FaceIndex = 0; FaceIndex < ModelData->nfaces(); FaceIndex++)
+		{
+			std::vector<int> FaceData = ModelData->face(FaceIndex);
+			Vec3f TriangleScreen[3];
+
+			// call each vertex's vertex shader.
+			for (int VertexIdx = 0; VertexIdx < 3; VertexIdx++)
+			{
+				TriangleScreen[VertexIdx] = SecondPassShader.Vertex(FaceIndex, VertexIdx);
+			}
+
+			// do the rasterization.
+			Triangle::DrawAndFillTriangleWithShader(TriangleScreen, SecondPassShader, ZBuffer, InImage);
+		}
+
+		delete[] ZBuffer;
+		delete[] ShadowBuffer;
+		delete ModelData;
+	}
 }
 
 int main(int argc, char** argv) 
@@ -436,7 +520,8 @@ int main(int argc, char** argv)
 	//DrawModelWithPerspectiveProjection(Width, Height, image);
 	//DrawModelGouraudShading(Width, Height, image);
 	
-	DrawModelByShader(image);
+	//DrawModelByShader(image);
+	DrawModelWithShadow(image);
 
 	image.flip_vertically(); // i want to have the origin at the left bottom corner of the image
 	image.write_tga_file("output.tga");

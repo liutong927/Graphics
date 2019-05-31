@@ -58,6 +58,12 @@ struct TGAColor {
 		for (int i = 0; i < 4; i++) res.bgra[i] = bgra[i] * intensity;
 		return res;
 	}
+
+	TGAColor operator /(float intensity) const {
+		TGAColor res = *this;
+		for (int i = 0; i < 4; i++) res.bgra[i] = bgra[i] / intensity;
+		return res;
+	}
 };
 
 
