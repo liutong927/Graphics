@@ -127,6 +127,11 @@ public:
 
 	// camera is at InEye, point to InCenter, InUp is camera direction which will be vertical frame
 	// how to compute this matrix?
+	// firstly we fix the z-axis which is camera to origin direction.
+	// then we need to get x-axis and y-axis, but how?
+	// we know upper vector in world, then we can compute right (x) axis of camera space by cross product
+	// of upper and camera vector.
+	// lastly we compute upper vector(y-axis) of camera space by another cross product of x and z.
 	static Matrix LookAt(Vec3f InEye, Vec3f InCenter, Vec3f InUp)
 	{
 		Matrix Result(Matrix::Identity(4));
@@ -135,14 +140,19 @@ public:
 		Vec3f x = cross(InUp, z).normalize();
 		Vec3f y = cross(z, x).normalize();
 
+		Matrix CameraFrame = Matrix::Identity(4);
+		Matrix Translation = Matrix::Identity(4);
+
+		// lookup matrix is camera frame multiply a translation(world to camera translation)
 		for (int i = 0; i < 3; i++)
 		{
-			Result[0][i] = x.raw[i];
-			Result[1][i] = y.raw[i];
-			Result[2][i] = z.raw[i];
-			Result[i][3] = -InCenter.raw[i];
+			CameraFrame[0][i] = x.raw[i];
+			CameraFrame[1][i] = y.raw[i];
+			CameraFrame[2][i] = z.raw[i];
+			Translation[i][3] = -InCenter.raw[i];
 		}
 
+		Result = CameraFrame * Translation;
 		return Result;
 	}
 

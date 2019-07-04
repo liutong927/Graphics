@@ -39,7 +39,7 @@ namespace
 	void DrawModelWireFrameTest(int InWidth, int InHeight, TGAImage& InImage)
 	{
 		// parse model file .obj using utils class Model.
-		Model ModelData("F:\\workdir\\personal\\Rasterizer\\Resource\\african_head.obj");
+		Model ModelData("C:\\Project\\GitRepos\\GraphicsStudy\\Rasterizer\\Resource\\african_head.obj");
 		for (int FaceIndex = 0; FaceIndex < ModelData.nfaces(); FaceIndex++)
 		{
 			std::vector<int> FaceData = ModelData.face(FaceIndex);
@@ -82,7 +82,7 @@ namespace
 	void DrawModelFlatShadingTest(int InWidth, int InHeight, TGAImage& InImage)
 	{
 		// parse model file .obj using utils class Model.
-		Model ModelData("F:\\workdir\\personal\\Rasterizer\\Resource\\african_head.obj");
+		Model ModelData("C:\\Project\\GitRepos\\GraphicsStudy\\Rasterizer\\Resource\\african_head.obj");
 
 		float* ZBuffer = new float[InWidth*InHeight];
 		for (int Index = 0; Index < InWidth*InHeight; Index++)
@@ -241,7 +241,7 @@ namespace
 	void DrawModelWithPerspectiveProjection(int InWidth, int InHeight, TGAImage& InImage)
 	{
 		// parse model file .obj using utils class Model.
-		Model ModelData("F:\\workdir\\personal\\Rasterizer\\Resource\\african_head.obj");
+		Model ModelData("C:\\Project\\GitRepos\\GraphicsStudy\\Rasterizer\\Resource\\african_head.obj");
 
 		float* ZBuffer = new float[InWidth*InHeight];
 		for (int Index = 0; Index < InWidth*InHeight; Index++)
@@ -310,7 +310,7 @@ namespace
 	void DrawModelGouraudShading(int InWidth, int InHeight, TGAImage& InImage)
 	{
 		// parse model file .obj using utils class Model.
-		Model ModelData("F:\\workdir\\personal\\Rasterizer\\Resource\\african_head.obj");
+		Model ModelData("C:\\Project\\GitRepos\\GraphicsStudy\\Rasterizer\\Resource\\african_head.obj");
 
 		float* ZBuffer = new float[InWidth*InHeight];
 		for (int Index = 0; Index < InWidth*InHeight; Index++)
@@ -369,7 +369,7 @@ namespace
 	void DrawModelByShader(TGAImage& InImage)
 	{
 		// parse model file .obj using utils class Model.
-		ModelData = new Model("F:\\workdir\\personal\\Rasterizer\\Resource\\african_head.obj");
+		ModelData = new Model("C:\\Project\\GitRepos\\GraphicsStudy\\Rasterizer\\Resource\\african_head.obj");
 		//ModelData = new Model("F:\\workdir\\personal\\Rasterizer\\Resource\\diablo3_pose.obj");
 		int InWidth = InImage.get_width();
 		int InHeight = InImage.get_height();
@@ -418,7 +418,7 @@ namespace
 	void DrawModelWithShadow(TGAImage& InImage)
 	{
 		// parse model file .obj using utils class Model.
-		ModelData = new Model("F:\\workdir\\personal\\Rasterizer\\Resource\\diablo3_pose.obj");
+		ModelData = new Model("C:\\Project\\GitRepos\\GraphicsStudy\\Rasterizer\\Resource\\diablo3_pose.obj");
 		int InWidth = InImage.get_width();
 		int InHeight = InImage.get_height();
 
